@@ -58,7 +58,7 @@ struct Digit {
 struct Filter {
   int mCell[2];
   int mValue;
-  enum class Type { Add, Sub, Mul, Div };
+  enum class Type { Add, Sub, Mul, Mod };
   Type mType;
   bool mPlaceable;
 };
@@ -122,7 +122,29 @@ void CreateLevels() {
       {
         .mCell = {3, 4},
         .mValue = 3,
-        .mType = Filter::Type::Div,
+        .mType = Filter::Type::Mod,
+        .mPlaceable = false,
+      },
+    };
+    level.mShifters = {
+      {
+        .mCell = {5, 7},
+        .mDirection = Direction::Down,
+        .mPlaceable = false,
+      },
+      {
+        .mCell = {8, 4},
+        .mDirection = Direction::Left,
+        .mPlaceable = false,
+      },
+      {
+        .mCell = {5, 1},
+        .mDirection = Direction::Up,
+        .mPlaceable = false,
+      },
+      {
+        .mCell = {2, 4},
+        .mDirection = Direction::Right,
         .mPlaceable = false,
       },
     };
@@ -167,6 +189,10 @@ void PerformStep() {
       continue;
     }
     World::Object modifierObj(&space, modifierMemberId);
+    auto* shifter = modifierObj.TryGet<Shifter>();
+    if (shifter != nullptr) {
+      digit.mDirection = shifter->mDirection;
+    }
     auto* filter = modifierObj.TryGet<Filter>();
     if (filter != nullptr) {
       switch (filter->mType) {
@@ -179,11 +205,11 @@ void PerformStep() {
       case Filter::Type::Mul:
         digit.mValue = digit.mValue * filter->mValue;
         break;
-      case Filter::Type::Div:
-        digit.mValue = digit.mValue / filter->mValue;
+      case Filter::Type::Mod:
+        digit.mValue = digit.mValue % filter->mValue;
         break;
       }
-      digit.mValue %= 10;
+      digit.mValue = (digit.mValue + 10) % 10;
     }
   }
 }
@@ -306,9 +332,42 @@ void LevelSetup(size_t levelIdx) {
     case Filter::Type::Add: filterChar = "+"; break;
     case Filter::Type::Sub: filterChar = "-"; break;
     case Filter::Type::Mul: filterChar = "*"; break;
-    case Filter::Type::Div: filterChar = "/"; break;
+    case Filter::Type::Mod: filterChar = "%"; break;
     }
     text.mText = filterChar + std::to_string(filter.mValue);
+  }
+
+  for (const Shifter& shifter: level.mShifters) {
+    World::Object shifterObject = space.CreateObject();
+    shifterObject.Add<Shifter>() = shifter;
+    auto& transform = shifterObject.Add<Comp::Transform>();
+    Vec3 offset = {
+      (float)shifter.mCell[0], (float)shifter.mCell[1], nModifierZ};
+    transform.SetTranslation(nFieldOrigin + offset);
+    transform.SetUniformScale(0.7f);
+    auto& sprite = shifterObject.Add<Comp::Sprite>();
+    sprite.mMaterialId = "images:DigitBg";
+
+    World::Object textChildObject = shifterObject.CreateChild();
+    auto& textTransform = textChildObject.Add<Comp::Transform>();
+    textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
+    textTransform.SetUniformScale(0.5f);
+    switch (shifter.mDirection) {
+    case Direction::Up:
+      transform.SetRotation(Quat::AngleAxis(Math::nPiO2, {0.0f, 0.0f, 1.0f}));
+      break;
+    case Direction::Right: break;
+    case Direction::Down:
+      transform.SetRotation(Quat::AngleAxis(-Math::nPiO2, {0.0f, 0.0f, 1.0f}));
+      break;
+    case Direction::Left:
+      transform.SetRotation(Quat::AngleAxis(Math::nPi, {0.0f, 0.0f, 1.0f}));
+      break;
+    }
+    auto& text = textChildObject.Add<Comp::Text>();
+    text.mColor = {0.0f, 0.6f, 0.0f, 1.0f};
+    text.mAlign = Comp::Text::Alignment::Center;
+    text.mText = ">";
   }
 
   for (int i = 0; i < 10; ++i) {
@@ -323,17 +382,22 @@ void LevelSetup(size_t levelIdx) {
     auto& digit = space.Get<Digit>(memberId);
     nDigitLayer[digit.mCell[0]][digit.mCell[1]] = memberId;
   }
-
   Ds::Vector<MemberId> filterIds = space.Slice<Filter>();
   for (MemberId memberId: filterIds) {
     auto& filter = space.Get<Filter>(memberId);
     nModifierLayer[filter.mCell[0]][filter.mCell[1]] = memberId;
+  }
+  Ds::Vector<MemberId> shifterIds = space.Slice<Shifter>();
+  for (MemberId memberId: shifterIds) {
+    auto& shifter = space.Get<Shifter>(memberId);
+    nModifierLayer[shifter.mCell[0]][shifter.mCell[1]] = memberId;
   }
 }
 
 void RegisterCustomTypes() {
   RegisterComponent(Digit);
   RegisterComponent(Filter);
+  RegisterComponent(Shifter);
 }
 
 int main(int argc, char* argv[]) {
