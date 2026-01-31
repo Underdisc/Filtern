@@ -40,11 +40,64 @@ struct Digit {
   Direction mDirection;
 };
 
+struct Filter {
+  enum class Type { Add, Sub, Mul, Div };
+  Type mType;
+  int mCell[2];
+  int mValue;
+  bool mPlaceable;
+};
+
+struct Shifter {
+  int mCell[2];
+  Direction mDirection;
+  bool mPlaceable;
+};
+
+bool nPaused = true;
 float nAutomataTimePassed = 0.9f;
 const Vec3 nFieldOrigin = {0.0f, 0.0f, 0.0f};
 constexpr int nFieldWidth = 10;
 constexpr int nFieldHeight = 10;
 World::MemberId nDigitLayer[nFieldHeight][nFieldWidth];
+World::MemberId nModifierLayer[nFieldHeight][nFieldWidth];
+
+World::Object nRunDisplay;
+
+struct Level {
+  Ds::Vector<Digit> mDigits;
+  Ds::Vector<Filter> mFilters;
+  Ds::Vector<Shifter> mShifters;
+};
+Ds::Vector<Level> nLevels;
+void CreateLevels() {
+  {
+    Level level;
+    level.mDigits = {
+      {
+        .mCell = {5, 5},
+        .mValue = 0,
+        .mDirection = Direction::Up,
+      },
+      {
+        .mCell = {6, 4},
+        .mValue = 1,
+        .mDirection = Direction::Right,
+      },
+      {
+        .mCell = {5, 3},
+        .mValue = 2,
+        .mDirection = Direction::Down,
+      },
+      {
+        .mCell = {4, 4},
+        .mValue = 3,
+        .mDirection = Direction::Left,
+      },
+    };
+    nLevels.Emplace(std::move(level));
+  }
+}
 
 void UpdateGraphics() {
   World::Space& space = World::nLayers.Back()->mSpace;
@@ -84,8 +137,27 @@ void RunAutomata() {
   }
 }
 
+void RunPlaceMode() {}
+
 void CentralUpdate() {
-  RunAutomata();
+  if (Input::KeyPressed(Input::Key::Space)) {
+    nPaused = !nPaused;
+    auto& text = nRunDisplay.Get<Comp::Text>();
+    if (nPaused) {
+      text.mText = "=";
+      nAutomataTimePassed = (float)(int)nAutomataTimePassed + 0.9f;
+    }
+    else {
+      text.mText = ">";
+    }
+  }
+
+  if (!nPaused) {
+    RunAutomata();
+  }
+  else {
+    RunPlaceMode();
+  }
 }
 
 void FieldSetup() {
@@ -109,6 +181,15 @@ void FieldSetup() {
     }
   }
 
+  nRunDisplay = field.CreateChild();
+  auto& runDisplayTransform = nRunDisplay.Add<Comp::Transform>();
+  runDisplayTransform.SetTranslation({14.5f, 8.0f, 0.0f});
+  runDisplayTransform.SetUniformScale(2.0f);
+  auto& runDisplayText = nRunDisplay.Add<Comp::Text>();
+  runDisplayText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  runDisplayText.mAlign = Comp::Text::Alignment::Center;
+  runDisplayText.mText = "=";
+
   World::Object camera = space.CreateObject();
   auto& cameraComp = camera.Add<Comp::Camera>();
   cameraComp.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
@@ -118,39 +199,18 @@ void FieldSetup() {
   cameraTransform.SetTranslation({9.0f, 4.5f, 3.0f});
 }
 
-void LevelSetup() {
+void LevelSetup(size_t levelIdx) {
   World::Space& space = World::nLayers.Back()->mSpace;
 
-  Digit digits[4] = {
-    {
-      .mCell = {5, 5},
-      .mValue = 0,
-      .mDirection = Direction::Up,
-    },
-    {
-      .mCell = {6, 4},
-      .mValue = 1,
-      .mDirection = Direction::Right,
-    },
-    {
-      .mCell = {5, 3},
-      .mValue = 2,
-      .mDirection = Direction::Down,
-    },
-    {
-      .mCell = {4, 4},
-      .mValue = 3,
-      .mDirection = Direction::Left,
-    },
-  };
-
-  for (int i = 0; i < 4; ++i) {
+  const Level& level = nLevels[levelIdx];
+  for (const Digit& digit: level.mDigits) {
     World::Object digitObject = space.CreateObject();
-    digitObject.Add<Digit>() = digits[i];
+    digitObject.Add<Digit>() = digit;
     auto& transform = digitObject.Add<Comp::Transform>();
-    Vec3 offset = {(float)digits[i].mCell[0], (float)digits[i].mCell[1], 1.0f};
+    Vec3 offset = {(float)digit.mCell[0], (float)digit.mCell[1], 1.0f};
     transform.SetTranslation(nFieldOrigin + offset);
     transform.SetUniformScale(0.9f);
+
     auto& sprite = digitObject.Add<Comp::Sprite>();
     sprite.mMaterialId = "images:DigitBg";
 
@@ -162,7 +222,7 @@ void LevelSetup() {
     auto& text = textChildObject.Add<Comp::Text>();
     text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
-    text.mText = std::to_string(digits[i].mValue);
+    text.mText = std::to_string(digit.mValue);
   }
 
   for (int i = 0; i < 10; ++i) {
@@ -191,8 +251,9 @@ int main(int argc, char* argv[]) {
   Result result = VarkorInit(argc, argv, std::move(config));
   LogAbortIf(!result.Success(), result.mError.c_str());
 
+  CreateLevels();
   FieldSetup();
-  LevelSetup();
+  LevelSetup(0);
   World::nCentralUpdate = CentralUpdate;
 
   VarkorRun();
