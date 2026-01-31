@@ -20,4 +20,25 @@
       ]
     }
   },
+  {
+    :Name: 'DigitBg'
+    :Type: 'Image'
+    :Config: {
+      :File: 'digit_bg.png'
+    }
+  },
+  {
+    :Name: 'DigitBg'
+    :Type: 'Material'
+    :Config: {
+      :ShaderId: 'vres/sprite:Default'
+      :Uniforms: [
+        {
+          :Name: 'uTexture'
+          :Type: 'Texture2dRes'
+          :Value: 'images:DigitBg'
+        }
+      ]
+    }
+  },
 ]

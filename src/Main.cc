@@ -1,20 +1,97 @@
 #include <Error.h>
+#include <Input.h>
 #include <Temporal.h>
 #include <VarkorMain.h>
 #include <comp/BoxCollider.h>
 #include <comp/Camera.h>
 #include <comp/CameraOrbiter.h>
+#include <comp/Name.h>
 #include <comp/Sprite.h>
+#include <comp/Text.h>
 #include <comp/Transform.h>
 #include <gfx/Renderer.h>
 #include <imgui/imgui.h>
 #include <math/Constants.h>
+#include <string>
 #include <world/Registrar.h>
 #include <world/World.h>
-#include <comp/Name.h>
 
-void Setup() {
-  Gfx::Renderer::nClearColor = {0.2f, 0.2f, 0.2f, 1.0};
+// This is a cellular automata type game. There are three primary game elements.
+
+// Requirement - A requirment occupies 2 cells, both of which can be anywhere on
+// the grid. One of the cells signifies a physical digit. The other cell
+// signifies the filtered digit.
+
+// Shifter - An arrow pointing in one of four directions. When a physical digit
+// arrives at a shifter, the physical digit begins to move in the direction the
+// arrow points.
+
+// Filter - When a physical digit arrives at the cell occupied by a filter, the
+// filter changes the digit, e.g. +1, *2, -5.
+
+// The goal is to place a set of filters and shifters, such that the physical
+// digits arrive at the filtered digits with the same values.
+
+enum class Direction { Up, Right, Down, Left };
+
+struct PhysicalDigit {
+  int mCell[2];
+  int mValue;
+  Direction mDirection;
+};
+
+float nAutomataTimePassed = 0.9f;
+const Vec3 nFieldOrigin = {0.0f, 0.0f, 0.0f};
+constexpr int nFieldWidth = 10;
+constexpr int nFieldHeight = 10;
+World::MemberId nPhysicalDigitLayer[nFieldHeight][nFieldWidth];
+
+void UpdateGraphics() {
+  World::Space& space = World::nLayers.Back()->mSpace;
+  Ds::Vector<MemberId> physicalDigitIds = space.Slice<PhysicalDigit>();
+  for (MemberId memberId: physicalDigitIds) {
+    const auto& physicalDigit = space.Get<PhysicalDigit>(memberId);
+    auto& transform = space.Get<Comp::Transform>(memberId);
+    Vec3 offset = {
+      (float)physicalDigit.mCell[0], (float)physicalDigit.mCell[1], 1.0f};
+    transform.SetTranslation(nFieldOrigin + offset);
+  }
+}
+
+void PerformStep() {
+  World::Space& space = World::nLayers.Back()->mSpace;
+  Ds::Vector<MemberId> physicalDigitIds = space.Slice<PhysicalDigit>();
+  for (MemberId memberId: physicalDigitIds) {
+    auto& physicalDigit = space.Get<PhysicalDigit>(memberId);
+    nPhysicalDigitLayer[physicalDigit.mCell[0]][physicalDigit.mCell[1]] =
+      World::nInvalidMemberId;
+    switch (physicalDigit.mDirection) {
+    case Direction::Up: physicalDigit.mCell[1] += 1; break;
+    case Direction::Right: physicalDigit.mCell[0] += 1; break;
+    case Direction::Down: physicalDigit.mCell[1] -= 1; break;
+    case Direction::Left: physicalDigit.mCell[0] -= 1; break;
+    }
+    physicalDigit.mCell[0] = Math::Clamp(0, 9, physicalDigit.mCell[0]);
+    physicalDigit.mCell[1] = Math::Clamp(0, 9, physicalDigit.mCell[1]);
+  }
+}
+
+void RunAutomata() {
+  int prevTimePassedFloor = (int)nAutomataTimePassed;
+  nAutomataTimePassed += Temporal::DeltaTime();
+  int currTimePassedFloor = (int)nAutomataTimePassed;
+  if (prevTimePassedFloor != currTimePassedFloor) {
+    PerformStep();
+    UpdateGraphics();
+  }
+}
+
+void CentralUpdate() {
+  RunAutomata();
+}
+
+void FieldSetup() {
+  Gfx::Renderer::nClearColor = {0.02f, 0.02f, 0.02f, 1.0};
 
   World::LayerIt layerIt = World::nLayers.EmplaceBack("Field");
   World::Space& space = layerIt->mSpace;
@@ -26,11 +103,9 @@ void Setup() {
     for (int j = 0; j < 10; ++j) {
       World::Object gridSquare = field.CreateChild();
       auto& squareTransform = gridSquare.Add<Comp::Transform>();
-      Vec3 startPosition = {-4.5f, -4.5f, 0.0f};
       Vec3 offset = {(float)j, (float)i, 0.0f};
-      squareTransform.SetTranslation(startPosition + offset);
+      squareTransform.SetTranslation(nFieldOrigin + offset);
       squareTransform.SetUniformScale(0.8f);
-      std::cout << squareTransform.GetTranslation() << std::endl;
       auto& squareSprite = gridSquare.Add<Comp::Sprite>();
       squareSprite.mMaterialId = "images:GridMaterial";
     }
@@ -42,11 +117,75 @@ void Setup() {
   cameraComp.mHeight = 11.0f;
   layerIt->mCameraId = camera.mMemberId;
   auto& cameraTransform = camera.Get<Comp::Transform>();
-  cameraTransform.SetTranslation({4.5f, 0.0f, 1.0f});
+  cameraTransform.SetTranslation({9.0f, 4.5f, 3.0f});
+}
+
+void LevelSetup() {
+  World::Space& space = World::nLayers.Back()->mSpace;
+
+  PhysicalDigit physicalDigits[4] = {
+    {
+      .mCell = {5, 5},
+      .mValue = 0,
+      .mDirection = Direction::Up,
+    },
+    {
+      .mCell = {6, 4},
+      .mValue = 1,
+      .mDirection = Direction::Right,
+    },
+    {
+      .mCell = {5, 3},
+      .mValue = 2,
+      .mDirection = Direction::Down,
+    },
+    {
+      .mCell = {4, 4},
+      .mValue = 3,
+      .mDirection = Direction::Left,
+    },
+  };
+
+  for (int i = 0; i < 4; ++i) {
+    World::Object physicalDigitObject = space.CreateObject();
+    physicalDigitObject.Add<PhysicalDigit>() = physicalDigits[i];
+    auto& transform = physicalDigitObject.Add<Comp::Transform>();
+    Vec3 offset = {
+      (float)physicalDigits[i].mCell[0],
+      (float)physicalDigits[i].mCell[1],
+      1.0f};
+    transform.SetTranslation(nFieldOrigin + offset);
+    transform.SetUniformScale(0.9f);
+    auto& sprite = physicalDigitObject.Add<Comp::Sprite>();
+    sprite.mMaterialId = "images:DigitBg";
+
+    World::Object textChildObject = physicalDigitObject.CreateChild();
+    auto& textTransform = textChildObject.Add<Comp::Transform>();
+    textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
+    textTransform.SetUniformScale(0.5f);
+
+    auto& text = textChildObject.Add<Comp::Text>();
+    text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    text.mAlign = Comp::Text::Alignment::Center;
+    text.mText = std::to_string(physicalDigits[i].mValue);
+  }
+
+  for (int i = 0; i < 10; ++i) {
+    for (int j = 0; j < 10; ++j) {
+      nPhysicalDigitLayer[j][i] = World::nInvalidMemberId;
+    }
+  }
+
+  Ds::Vector<MemberId> physicalDigitIds = space.Slice<PhysicalDigit>();
+  for (MemberId memberId: physicalDigitIds) {
+    auto& physicalDigit = space.Get<PhysicalDigit>(memberId);
+    nPhysicalDigitLayer[physicalDigit.mCell[0]][physicalDigit.mCell[1]] =
+      memberId;
+  }
 }
 
 void RegisterCustomTypes() {
-  using namespace Comp;
+  RegisterComponent(PhysicalDigit);
 }
 
 int main(int argc, char* argv[]) {
@@ -58,7 +197,9 @@ int main(int argc, char* argv[]) {
   Result result = VarkorInit(argc, argv, std::move(config));
   LogAbortIf(!result.Success(), result.mError.c_str());
 
-  Setup();
+  FieldSetup();
+  LevelSetup();
+  World::nCentralUpdate = CentralUpdate;
 
   VarkorRun();
   VarkorPurge();
