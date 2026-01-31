@@ -43,9 +43,26 @@ constexpr int nFieldHeight = 10;
 World::MemberId nDigitLayer[nFieldHeight][nFieldWidth];
 World::MemberId nModifierLayer[nFieldHeight][nFieldWidth];
 
+const float nCursorZ = -1.0f;
 const float nFieldZ = 0.0f;
 const float nModifierZ = 1.0f;
 const float nDigitZ = 2.0f;
+
+const float nModifierScale = 0.7f;
+const float nPlaceableScale = 1.2f;
+const float nDigitScale = 0.6f;
+
+const Vec3 nPlaceableIdsOrigin = {12.0f, 7.0f, nModifierZ};
+Ds::Vector<World::MemberId> nPlaceableIds;
+const int nPlaceableCols = 6;
+
+struct Cursor {
+  World::Object mObject;
+  bool mInField;
+  int mCell[2];
+  int mPlaceableCell[2];
+};
+Cursor nCursor;
 
 World::Object nRunDisplay;
 
@@ -102,50 +119,50 @@ void CreateLevels() {
     };
     level.mFilters = {
       {
-        .mCell = {5, 6},
+        .mCell = {-1, -1},
         .mValue = 3,
         .mType = Filter::Type::Add,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
       {
-        .mCell = {7, 4},
+        .mCell = {-1, -1},
         .mValue = 1,
         .mType = Filter::Type::Sub,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
       {
-        .mCell = {5, 2},
+        .mCell = {-1, -1},
         .mValue = 3,
         .mType = Filter::Type::Mul,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
       {
-        .mCell = {3, 4},
+        .mCell = {-1, -1},
         .mValue = 3,
         .mType = Filter::Type::Mod,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
     };
     level.mShifters = {
       {
-        .mCell = {5, 7},
+        .mCell = {-1, -1},
         .mDirection = Direction::Down,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
       {
-        .mCell = {8, 4},
+        .mCell = {-1, -1},
         .mDirection = Direction::Left,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
       {
-        .mCell = {5, 1},
+        .mCell = {-1, -1},
         .mDirection = Direction::Up,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
       {
-        .mCell = {2, 4},
+        .mCell = {-1, -1},
         .mDirection = Direction::Right,
-        .mPlaceable = false,
+        .mPlaceable = true,
       },
     };
     nLevels.Emplace(std::move(level));
@@ -224,7 +241,69 @@ void RunAutomata() {
   }
 }
 
-void RunPlaceMode() {}
+void RunPlaceMode() {
+  if (Input::KeyPressed(Input::Key::S)) {
+    nCursor.mInField = !nCursor.mInField;
+  }
+
+  int direction[2] = {0, 0};
+  if (Input::KeyPressed(Input::Key::Up)) {
+    direction[1] = 1;
+  }
+  if (Input::KeyPressed(Input::Key::Right)) {
+    direction[0] = 1;
+  }
+  if (Input::KeyPressed(Input::Key::Down)) {
+    direction[1] = -1;
+  }
+  if (Input::KeyPressed(Input::Key::Left)) {
+    direction[0] = -1;
+  }
+
+  auto& cursorSprite = nCursor.mObject.Get<Comp::Sprite>();
+  if (cursorSprite.mVisible && (direction[0] != 0 || direction[1] != 0)) {
+    if (nCursor.mInField) {
+      nCursor.mCell[0] = (nCursor.mCell[0] + direction[0] + 10) % 10;
+      nCursor.mCell[1] = (nCursor.mCell[1] + direction[1] + 10) % 10;
+    }
+    else {
+      nCursor.mPlaceableCell[0] += direction[0];
+      nCursor.mPlaceableCell[1] += direction[1];
+      // Handle column wrapping
+      int lastCol = (nPlaceableIds.Size() - 1) % nPlaceableCols;
+      int lastRow = (nPlaceableIds.Size() - 1) / nPlaceableCols;
+      if (nCursor.mPlaceableCell[1] == lastRow) {
+        nCursor.mPlaceableCell[0] =
+          (nCursor.mPlaceableCell[0] + (lastCol + 1)) % (lastCol + 1);
+      }
+      else {
+        nCursor.mPlaceableCell[0] =
+          (nCursor.mPlaceableCell[0] + nPlaceableCols) % nPlaceableCols;
+      }
+      // Handle row wrapping
+      if (nCursor.mPlaceableCell[0] <= lastCol) {
+        nCursor.mPlaceableCell[1] =
+          (nCursor.mPlaceableCell[1] + (lastRow + 1)) % (lastRow + 1);
+      }
+      else {
+        nCursor.mPlaceableCell[1] =
+          (nCursor.mPlaceableCell[1] + lastRow) % lastRow;
+      }
+    }
+  }
+  auto& cursorTransform = nCursor.mObject.Get<Comp::Transform>();
+  if (nCursor.mInField) {
+    Vec3 offset = {(float)nCursor.mCell[0], (float)nCursor.mCell[1], nCursorZ};
+    cursorTransform.SetTranslation(nFieldOrigin + offset);
+  }
+  else {
+    Vec3 offset = {
+      (float)nCursor.mPlaceableCell[0],
+      -(float)nCursor.mPlaceableCell[1],
+      nCursorZ};
+    cursorTransform.SetTranslation(nPlaceableIdsOrigin + offset);
+  }
+}
 
 void CentralUpdate() {
   if (Input::KeyPressed(Input::Key::Space)) {
@@ -277,6 +356,18 @@ void FieldSetup() {
   runDisplayText.mAlign = Comp::Text::Alignment::Center;
   runDisplayText.mText = "=";
 
+  nCursor.mObject = space.CreateObject();
+  auto& cursorTransform = nCursor.mObject.Add<Comp::Transform>();
+  Vec3 offset = {0.0f, 0.0f, nCursorZ};
+  cursorTransform.SetTranslation(nFieldOrigin + offset);
+  nCursor.mInField = true;
+  nCursor.mCell[0] = 0;
+  nCursor.mCell[1] = 0;
+  nCursor.mPlaceableCell[0] = 0;
+  nCursor.mPlaceableCell[1] = 0;
+  auto& cursorSprite = nCursor.mObject.Add<Comp::Sprite>();
+  cursorSprite.mMaterialId = "images:Cursor";
+
   World::Object camera = space.CreateObject();
   auto& cameraComp = camera.Add<Comp::Camera>();
   cameraComp.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
@@ -296,7 +387,7 @@ void LevelSetup(size_t levelIdx) {
     auto& transform = digitObject.Add<Comp::Transform>();
     Vec3 offset = {(float)digit.mCell[0], (float)digit.mCell[1], nDigitZ};
     transform.SetTranslation(nFieldOrigin + offset);
-    transform.SetUniformScale(0.6f);
+    transform.SetUniformScale(nDigitScale);
     auto& sprite = digitObject.Add<Comp::Sprite>();
     sprite.mMaterialId = "images:DigitBg";
 
@@ -310,13 +401,14 @@ void LevelSetup(size_t levelIdx) {
     text.mText = std::to_string(digit.mValue);
   }
 
+  nPlaceableIds.Clear();
   for (const Filter& filter: level.mFilters) {
     World::Object filterObject = space.CreateObject();
     filterObject.Add<Filter>() = filter;
     auto& transform = filterObject.Add<Comp::Transform>();
     Vec3 offset = {(float)filter.mCell[0], (float)filter.mCell[1], nModifierZ};
     transform.SetTranslation(nFieldOrigin + offset);
-    transform.SetUniformScale(0.7f);
+    transform.SetUniformScale(nModifierScale);
     auto& sprite = filterObject.Add<Comp::Sprite>();
     sprite.mMaterialId = "images:DigitBg";
 
@@ -335,6 +427,10 @@ void LevelSetup(size_t levelIdx) {
     case Filter::Type::Mod: filterChar = "%"; break;
     }
     text.mText = filterChar + std::to_string(filter.mValue);
+
+    if (filter.mPlaceable) {
+      nPlaceableIds.Push(filterObject.mMemberId);
+    }
   }
 
   for (const Shifter& shifter: level.mShifters) {
@@ -344,14 +440,14 @@ void LevelSetup(size_t levelIdx) {
     Vec3 offset = {
       (float)shifter.mCell[0], (float)shifter.mCell[1], nModifierZ};
     transform.SetTranslation(nFieldOrigin + offset);
-    transform.SetUniformScale(0.7f);
+    transform.SetUniformScale(nModifierScale);
     auto& sprite = shifterObject.Add<Comp::Sprite>();
     sprite.mMaterialId = "images:DigitBg";
 
     World::Object textChildObject = shifterObject.CreateChild();
     auto& textTransform = textChildObject.Add<Comp::Transform>();
     textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
-    textTransform.SetUniformScale(0.5f);
+    textTransform.SetUniformScale(0.7f);
     switch (shifter.mDirection) {
     case Direction::Up:
       transform.SetRotation(Quat::AngleAxis(Math::nPiO2, {0.0f, 0.0f, 1.0f}));
@@ -368,6 +464,17 @@ void LevelSetup(size_t levelIdx) {
     text.mColor = {0.0f, 0.6f, 0.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
     text.mText = ">";
+
+    if (shifter.mPlaceable) {
+      nPlaceableIds.Push(shifterObject.mMemberId);
+    }
+  }
+
+  for (size_t i = 0; i < nPlaceableIds.Size(); ++i) {
+    auto& transform = space.Get<Comp::Transform>(nPlaceableIds[i]);
+    Vec3 offset = {
+      (float)(i % nPlaceableCols), -(float)(i / nPlaceableCols), nModifierZ};
+    transform.SetTranslation(nPlaceableIdsOrigin + offset);
   }
 
   for (int i = 0; i < 10; ++i) {

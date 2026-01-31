@@ -41,4 +41,25 @@
       ]
     }
   },
+  {
+    :Name: 'Cursor'
+    :Type: 'Image'
+    :Config: {
+      :File: 'cursor.png'
+    }
+  },
+  {
+    :Name: 'Cursor'
+    :Type: 'Material'
+    :Config: {
+      :ShaderId: 'vres/sprite:Default'
+      :Uniforms: [
+        {
+          :Name: 'uTexture'
+          :Type: 'Texture2dRes'
+          :Value: 'images:Cursor'
+        }
+      ]
+    }
+  },
 ]
