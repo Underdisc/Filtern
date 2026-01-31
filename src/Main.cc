@@ -59,6 +59,7 @@ const int nPlaceableCols = 6;
 struct Cursor {
   World::Object mObject;
   bool mInField;
+  bool mPlaceableSelected;
   int mCell[2];
   int mPlaceableCell[2];
 };
@@ -246,6 +247,7 @@ void RunPlaceMode() {
     nCursor.mInField = !nCursor.mInField;
   }
 
+  // Handle cursor movement.
   int direction[2] = {0, 0};
   if (Input::KeyPressed(Input::Key::Up)) {
     direction[1] = 1;
@@ -260,37 +262,35 @@ void RunPlaceMode() {
     direction[0] = -1;
   }
 
-  auto& cursorSprite = nCursor.mObject.Get<Comp::Sprite>();
-  if (cursorSprite.mVisible && (direction[0] != 0 || direction[1] != 0)) {
-    if (nCursor.mInField) {
-      nCursor.mCell[0] = (nCursor.mCell[0] + direction[0] + 10) % 10;
-      nCursor.mCell[1] = (nCursor.mCell[1] + direction[1] + 10) % 10;
+  if (nCursor.mInField) {
+    nCursor.mCell[0] = (nCursor.mCell[0] + direction[0] + 10) % 10;
+    nCursor.mCell[1] = (nCursor.mCell[1] + direction[1] + 10) % 10;
+  }
+  else {
+    nCursor.mPlaceableCell[0] += direction[0];
+    nCursor.mPlaceableCell[1] += direction[1];
+    // Handle column wrapping
+    int lastCol = (nPlaceableIds.Size() - 1) % nPlaceableCols;
+    int lastRow = (nPlaceableIds.Size() - 1) / nPlaceableCols;
+    if (nCursor.mPlaceableCell[1] == lastRow) {
+      nCursor.mPlaceableCell[0] =
+        (nCursor.mPlaceableCell[0] + (lastCol + 1)) % (lastCol + 1);
     }
     else {
-      nCursor.mPlaceableCell[0] += direction[0];
-      nCursor.mPlaceableCell[1] += direction[1];
-      // Handle column wrapping
-      int lastCol = (nPlaceableIds.Size() - 1) % nPlaceableCols;
-      int lastRow = (nPlaceableIds.Size() - 1) / nPlaceableCols;
-      if (nCursor.mPlaceableCell[1] == lastRow) {
-        nCursor.mPlaceableCell[0] =
-          (nCursor.mPlaceableCell[0] + (lastCol + 1)) % (lastCol + 1);
-      }
-      else {
-        nCursor.mPlaceableCell[0] =
-          (nCursor.mPlaceableCell[0] + nPlaceableCols) % nPlaceableCols;
-      }
-      // Handle row wrapping
-      if (nCursor.mPlaceableCell[0] <= lastCol) {
-        nCursor.mPlaceableCell[1] =
-          (nCursor.mPlaceableCell[1] + (lastRow + 1)) % (lastRow + 1);
-      }
-      else {
-        nCursor.mPlaceableCell[1] =
-          (nCursor.mPlaceableCell[1] + lastRow) % lastRow;
-      }
+      nCursor.mPlaceableCell[0] =
+        (nCursor.mPlaceableCell[0] + nPlaceableCols) % nPlaceableCols;
+    }
+    // Handle row wrapping
+    if (nCursor.mPlaceableCell[0] <= lastCol) {
+      nCursor.mPlaceableCell[1] =
+        (nCursor.mPlaceableCell[1] + (lastRow + 1)) % (lastRow + 1);
+    }
+    else {
+      nCursor.mPlaceableCell[1] =
+        (nCursor.mPlaceableCell[1] + lastRow) % lastRow;
     }
   }
+
   auto& cursorTransform = nCursor.mObject.Get<Comp::Transform>();
   if (nCursor.mInField) {
     Vec3 offset = {(float)nCursor.mCell[0], (float)nCursor.mCell[1], nCursorZ};
