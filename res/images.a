@@ -1,0 +1,23 @@
+[
+  {
+    :Name: 'GridSquare'
+    :Type: 'Image'
+    :Config: {
+      :File: 'grid_square.png'
+    }
+  },
+  {
+    :Name: 'GridMaterial'
+    :Type: 'Material'
+    :Config: {
+      :ShaderId: 'vres/sprite:Default'
+      :Uniforms: [
+        {
+          :Name: 'uTexture'
+          :Type: 'Texture2dRes'
+          :Value: 'images:GridSquare'
+        }
+      ]
+    }
+  },
+]
