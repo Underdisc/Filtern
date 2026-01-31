@@ -34,7 +34,7 @@
 
 enum class Direction { Up, Right, Down, Left };
 
-struct PhysicalDigit {
+struct Digit {
   int mCell[2];
   int mValue;
   Direction mDirection;
@@ -44,35 +44,33 @@ float nAutomataTimePassed = 0.9f;
 const Vec3 nFieldOrigin = {0.0f, 0.0f, 0.0f};
 constexpr int nFieldWidth = 10;
 constexpr int nFieldHeight = 10;
-World::MemberId nPhysicalDigitLayer[nFieldHeight][nFieldWidth];
+World::MemberId nDigitLayer[nFieldHeight][nFieldWidth];
 
 void UpdateGraphics() {
   World::Space& space = World::nLayers.Back()->mSpace;
-  Ds::Vector<MemberId> physicalDigitIds = space.Slice<PhysicalDigit>();
-  for (MemberId memberId: physicalDigitIds) {
-    const auto& physicalDigit = space.Get<PhysicalDigit>(memberId);
+  Ds::Vector<MemberId> digitIds = space.Slice<Digit>();
+  for (MemberId memberId: digitIds) {
+    const auto& digit = space.Get<Digit>(memberId);
     auto& transform = space.Get<Comp::Transform>(memberId);
-    Vec3 offset = {
-      (float)physicalDigit.mCell[0], (float)physicalDigit.mCell[1], 1.0f};
+    Vec3 offset = {(float)digit.mCell[0], (float)digit.mCell[1], 1.0f};
     transform.SetTranslation(nFieldOrigin + offset);
   }
 }
 
 void PerformStep() {
   World::Space& space = World::nLayers.Back()->mSpace;
-  Ds::Vector<MemberId> physicalDigitIds = space.Slice<PhysicalDigit>();
-  for (MemberId memberId: physicalDigitIds) {
-    auto& physicalDigit = space.Get<PhysicalDigit>(memberId);
-    nPhysicalDigitLayer[physicalDigit.mCell[0]][physicalDigit.mCell[1]] =
-      World::nInvalidMemberId;
-    switch (physicalDigit.mDirection) {
-    case Direction::Up: physicalDigit.mCell[1] += 1; break;
-    case Direction::Right: physicalDigit.mCell[0] += 1; break;
-    case Direction::Down: physicalDigit.mCell[1] -= 1; break;
-    case Direction::Left: physicalDigit.mCell[0] -= 1; break;
+  Ds::Vector<MemberId> digitIds = space.Slice<Digit>();
+  for (MemberId memberId: digitIds) {
+    auto& digit = space.Get<Digit>(memberId);
+    nDigitLayer[digit.mCell[0]][digit.mCell[1]] = World::nInvalidMemberId;
+    switch (digit.mDirection) {
+    case Direction::Up: digit.mCell[1] += 1; break;
+    case Direction::Right: digit.mCell[0] += 1; break;
+    case Direction::Down: digit.mCell[1] -= 1; break;
+    case Direction::Left: digit.mCell[0] -= 1; break;
     }
-    physicalDigit.mCell[0] = Math::Clamp(0, 9, physicalDigit.mCell[0]);
-    physicalDigit.mCell[1] = Math::Clamp(0, 9, physicalDigit.mCell[1]);
+    digit.mCell[0] = Math::Clamp(0, 9, digit.mCell[0]);
+    digit.mCell[1] = Math::Clamp(0, 9, digit.mCell[1]);
   }
 }
 
@@ -123,7 +121,7 @@ void FieldSetup() {
 void LevelSetup() {
   World::Space& space = World::nLayers.Back()->mSpace;
 
-  PhysicalDigit physicalDigits[4] = {
+  Digit digits[4] = {
     {
       .mCell = {5, 5},
       .mValue = 0,
@@ -147,19 +145,16 @@ void LevelSetup() {
   };
 
   for (int i = 0; i < 4; ++i) {
-    World::Object physicalDigitObject = space.CreateObject();
-    physicalDigitObject.Add<PhysicalDigit>() = physicalDigits[i];
-    auto& transform = physicalDigitObject.Add<Comp::Transform>();
-    Vec3 offset = {
-      (float)physicalDigits[i].mCell[0],
-      (float)physicalDigits[i].mCell[1],
-      1.0f};
+    World::Object digitObject = space.CreateObject();
+    digitObject.Add<Digit>() = digits[i];
+    auto& transform = digitObject.Add<Comp::Transform>();
+    Vec3 offset = {(float)digits[i].mCell[0], (float)digits[i].mCell[1], 1.0f};
     transform.SetTranslation(nFieldOrigin + offset);
     transform.SetUniformScale(0.9f);
-    auto& sprite = physicalDigitObject.Add<Comp::Sprite>();
+    auto& sprite = digitObject.Add<Comp::Sprite>();
     sprite.mMaterialId = "images:DigitBg";
 
-    World::Object textChildObject = physicalDigitObject.CreateChild();
+    World::Object textChildObject = digitObject.CreateChild();
     auto& textTransform = textChildObject.Add<Comp::Transform>();
     textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
     textTransform.SetUniformScale(0.5f);
@@ -167,25 +162,24 @@ void LevelSetup() {
     auto& text = textChildObject.Add<Comp::Text>();
     text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
-    text.mText = std::to_string(physicalDigits[i].mValue);
+    text.mText = std::to_string(digits[i].mValue);
   }
 
   for (int i = 0; i < 10; ++i) {
     for (int j = 0; j < 10; ++j) {
-      nPhysicalDigitLayer[j][i] = World::nInvalidMemberId;
+      nDigitLayer[j][i] = World::nInvalidMemberId;
     }
   }
 
-  Ds::Vector<MemberId> physicalDigitIds = space.Slice<PhysicalDigit>();
-  for (MemberId memberId: physicalDigitIds) {
-    auto& physicalDigit = space.Get<PhysicalDigit>(memberId);
-    nPhysicalDigitLayer[physicalDigit.mCell[0]][physicalDigit.mCell[1]] =
-      memberId;
+  Ds::Vector<MemberId> digitIds = space.Slice<Digit>();
+  for (MemberId memberId: digitIds) {
+    auto& digit = space.Get<Digit>(memberId);
+    nDigitLayer[digit.mCell[0]][digit.mCell[1]] = memberId;
   }
 }
 
 void RegisterCustomTypes() {
-  RegisterComponent(PhysicalDigit);
+  RegisterComponent(Digit);
 }
 
 int main(int argc, char* argv[]) {
