@@ -83,4 +83,25 @@
       ]
     }
   },
+  {
+    :Name: 'Selected'
+    :Type: 'Image'
+    :Config: {
+      :File: 'selected.png'
+    }
+  },
+  {
+    :Name: 'Selected'
+    :Type: 'Material'
+    :Config: {
+      :ShaderId: 'vres/sprite:Default'
+      :Uniforms: [
+        {
+          :Name: 'uTexture'
+          :Type: 'Texture2dRes'
+          :Value: 'images:Selected'
+        }
+      ]
+    }
+  },
 ]

@@ -40,8 +40,8 @@ float nAutomataTimePassed = 0.9f;
 const Vec3 nFieldOrigin = {0.0f, 0.0f, 0.0f};
 constexpr int nFieldWidth = 10;
 constexpr int nFieldHeight = 10;
-World::MemberId nDigitLayer[nFieldHeight][nFieldWidth];
-World::MemberId nModifierLayer[nFieldHeight][nFieldWidth];
+World::MemberId nDigitLayer[nFieldWidth][nFieldHeight];
+World::MemberId nModifierLayer[nFieldWidth][nFieldHeight];
 
 const float nCursorZ = -1.0f;
 const float nFieldZ = 0.0f;
@@ -58,6 +58,7 @@ const int nPlaceableCols = 6;
 
 struct Cursor {
   World::Object mObject;
+  World::Object mSelectedObject;
   bool mInField;
   bool mPlaceableSelected;
   int mCell[2];
@@ -74,7 +75,7 @@ struct Digit {
 };
 
 struct Filter {
-  int mCell[2];
+  int mStartCell[2];
   int mValue;
   enum class Type { Add, Sub, Mul, Mod };
   Type mType;
@@ -82,7 +83,7 @@ struct Filter {
 };
 
 struct Shifter {
-  int mCell[2];
+  int mStartCell[2];
   Direction mDirection;
   bool mPlaceable;
 };
@@ -120,25 +121,25 @@ void CreateLevels() {
     };
     level.mFilters = {
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mValue = 3,
         .mType = Filter::Type::Add,
         .mPlaceable = true,
       },
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mValue = 1,
         .mType = Filter::Type::Sub,
         .mPlaceable = true,
       },
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mValue = 3,
         .mType = Filter::Type::Mul,
         .mPlaceable = true,
       },
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mValue = 3,
         .mType = Filter::Type::Mod,
         .mPlaceable = true,
@@ -146,27 +147,37 @@ void CreateLevels() {
     };
     level.mShifters = {
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mDirection = Direction::Down,
         .mPlaceable = true,
       },
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mDirection = Direction::Left,
         .mPlaceable = true,
       },
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mDirection = Direction::Up,
         .mPlaceable = true,
       },
       {
-        .mCell = {-1, -1},
+        .mStartCell = {-1, -1},
         .mDirection = Direction::Right,
         .mPlaceable = true,
       },
     };
     nLevels.Emplace(std::move(level));
+  }
+}
+
+void UpdatePlaceableGraphics() {
+  World::Space& space = World::nLayers.Back()->mSpace;
+  for (size_t i = 0; i < nPlaceableIds.Size(); ++i) {
+    auto& transform = space.Get<Comp::Transform>(nPlaceableIds[i]);
+    Vec3 offset = {
+      (float)(i % nPlaceableCols), -(float)(i / nPlaceableCols), nModifierZ};
+    transform.SetTranslation(nPlaceableIdsOrigin + offset);
   }
 }
 
@@ -242,9 +253,63 @@ void RunAutomata() {
   }
 }
 
+void TryRemoveModifierFromField(World::MemberId memberId) {
+  World::Space& space = World::nLayers.Back()->mSpace;
+  if (memberId != World::nInvalidMemberId) {
+    auto* filter = space.TryGet<Filter>(memberId);
+    if (filter != nullptr && !filter->mPlaceable) {
+      return;
+    }
+    auto* shifter = space.TryGet<Shifter>(memberId);
+    if (shifter != nullptr && !shifter->mPlaceable) {
+      return;
+    }
+    nPlaceableIds.Push(memberId);
+    nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]] =
+      World::nInvalidMemberId;
+  }
+}
+
 void RunPlaceMode() {
   if (Input::KeyPressed(Input::Key::S)) {
     nCursor.mInField = !nCursor.mInField;
+    nCursor.mPlaceableSelected = false;
+    nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
+  }
+
+  // Handle placement and removal of field modifiers
+  World::Space& space = World::nLayers.Back()->mSpace;
+  if (Input::KeyPressed(Input::Key::D)) {
+    if (!nCursor.mInField) {
+      nCursor.mInField = true;
+      nCursor.mPlaceableSelected = true;
+      Vec3 offset = {
+        (float)nCursor.mPlaceableCell[0],
+        -(float)nCursor.mPlaceableCell[1],
+        nCursorZ};
+      auto& selectedTransform = nCursor.mSelectedObject.Get<Comp::Transform>();
+      selectedTransform.SetTranslation(nPlaceableIdsOrigin + offset);
+      nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = true;
+    }
+    else {
+      World::MemberId modifierIdUnderCursor =
+        nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]];
+      TryRemoveModifierFromField(modifierIdUnderCursor);
+      if (nCursor.mPlaceableSelected) {
+        size_t placeableIndex =
+          nCursor.mPlaceableCell[0] + (nCursor.mPlaceableCell[1] * 6);
+        World::MemberId placeableId = nPlaceableIds[placeableIndex];
+        nPlaceableIds.Remove(placeableIndex);
+        auto& placeableTransform = space.Get<Comp::Transform>(placeableId);
+        Vec3 offset = {
+          (float)nCursor.mCell[0], (float)nCursor.mCell[1], nModifierZ};
+        placeableTransform.SetTranslation(nFieldOrigin + offset);
+        nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]] = placeableId;
+        nCursor.mPlaceableSelected = false;
+        nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
+      }
+      UpdatePlaceableGraphics();
+    }
   }
 
   // Handle cursor movement.
@@ -361,12 +426,21 @@ void FieldSetup() {
   Vec3 offset = {0.0f, 0.0f, nCursorZ};
   cursorTransform.SetTranslation(nFieldOrigin + offset);
   nCursor.mInField = true;
+  nCursor.mPlaceableSelected = false;
   nCursor.mCell[0] = 0;
   nCursor.mCell[1] = 0;
   nCursor.mPlaceableCell[0] = 0;
   nCursor.mPlaceableCell[1] = 0;
   auto& cursorSprite = nCursor.mObject.Add<Comp::Sprite>();
   cursorSprite.mMaterialId = "images:Cursor";
+
+  nCursor.mSelectedObject = space.CreateObject();
+  auto& selectedTransform = nCursor.mSelectedObject.Add<Comp::Transform>();
+  offset = {0.0f, 0.0f, nCursorZ};
+  selectedTransform.SetTranslation(nPlaceableIdsOrigin + offset);
+  auto& selectedSprite = nCursor.mSelectedObject.Add<Comp::Sprite>();
+  selectedSprite.mMaterialId = "images:Selected";
+  selectedSprite.mVisible = false;
 
   World::Object camera = space.CreateObject();
   auto& cameraComp = camera.Add<Comp::Camera>();
@@ -406,7 +480,8 @@ void LevelSetup(size_t levelIdx) {
     World::Object filterObject = space.CreateObject();
     filterObject.Add<Filter>() = filter;
     auto& transform = filterObject.Add<Comp::Transform>();
-    Vec3 offset = {(float)filter.mCell[0], (float)filter.mCell[1], nModifierZ};
+    Vec3 offset = {
+      (float)filter.mStartCell[0], (float)filter.mStartCell[1], nModifierZ};
     transform.SetTranslation(nFieldOrigin + offset);
     transform.SetUniformScale(nModifierScale);
     auto& sprite = filterObject.Add<Comp::Sprite>();
@@ -438,7 +513,7 @@ void LevelSetup(size_t levelIdx) {
     shifterObject.Add<Shifter>() = shifter;
     auto& transform = shifterObject.Add<Comp::Transform>();
     Vec3 offset = {
-      (float)shifter.mCell[0], (float)shifter.mCell[1], nModifierZ};
+      (float)shifter.mStartCell[0], (float)shifter.mStartCell[1], nModifierZ};
     transform.SetTranslation(nFieldOrigin + offset);
     transform.SetUniformScale(nModifierScale);
     auto& sprite = shifterObject.Add<Comp::Sprite>();
@@ -470,12 +545,7 @@ void LevelSetup(size_t levelIdx) {
     }
   }
 
-  for (size_t i = 0; i < nPlaceableIds.Size(); ++i) {
-    auto& transform = space.Get<Comp::Transform>(nPlaceableIds[i]);
-    Vec3 offset = {
-      (float)(i % nPlaceableCols), -(float)(i / nPlaceableCols), nModifierZ};
-    transform.SetTranslation(nPlaceableIdsOrigin + offset);
-  }
+  UpdatePlaceableGraphics();
 
   for (int i = 0; i < 10; ++i) {
     for (int j = 0; j < 10; ++j) {
@@ -492,12 +562,12 @@ void LevelSetup(size_t levelIdx) {
   Ds::Vector<MemberId> filterIds = space.Slice<Filter>();
   for (MemberId memberId: filterIds) {
     auto& filter = space.Get<Filter>(memberId);
-    nModifierLayer[filter.mCell[0]][filter.mCell[1]] = memberId;
+    nModifierLayer[filter.mStartCell[0]][filter.mStartCell[1]] = memberId;
   }
   Ds::Vector<MemberId> shifterIds = space.Slice<Shifter>();
   for (MemberId memberId: shifterIds) {
     auto& shifter = space.Get<Shifter>(memberId);
-    nModifierLayer[shifter.mCell[0]][shifter.mCell[1]] = memberId;
+    nModifierLayer[shifter.mStartCell[0]][shifter.mStartCell[1]] = memberId;
   }
 }
 
