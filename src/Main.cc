@@ -396,7 +396,7 @@ void LevelSetup(size_t levelIdx) {
     textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
     textTransform.SetUniformScale(0.5f);
     auto& text = textChildObject.Add<Comp::Text>();
-    text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    text.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
     text.mText = std::to_string(digit.mValue);
   }
@@ -410,14 +410,14 @@ void LevelSetup(size_t levelIdx) {
     transform.SetTranslation(nFieldOrigin + offset);
     transform.SetUniformScale(nModifierScale);
     auto& sprite = filterObject.Add<Comp::Sprite>();
-    sprite.mMaterialId = "images:DigitBg";
+    sprite.mMaterialId = "images:ModifierBg";
 
     World::Object textChildObject = filterObject.CreateChild();
     auto& textTransform = textChildObject.Add<Comp::Transform>();
     textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
     textTransform.SetUniformScale(0.5f);
     auto& text = textChildObject.Add<Comp::Text>();
-    text.mColor = {0.0f, 0.6f, 0.0f, 1.0f};
+    text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
     std::string filterChar = "";
     switch (filter.mType) {
@@ -442,7 +442,7 @@ void LevelSetup(size_t levelIdx) {
     transform.SetTranslation(nFieldOrigin + offset);
     transform.SetUniformScale(nModifierScale);
     auto& sprite = shifterObject.Add<Comp::Sprite>();
-    sprite.mMaterialId = "images:DigitBg";
+    sprite.mMaterialId = "images:ModifierBg";
 
     World::Object textChildObject = shifterObject.CreateChild();
     auto& textTransform = textChildObject.Add<Comp::Transform>();
@@ -461,7 +461,7 @@ void LevelSetup(size_t levelIdx) {
       break;
     }
     auto& text = textChildObject.Add<Comp::Text>();
-    text.mColor = {0.0f, 0.6f, 0.0f, 1.0f};
+    text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
     text.mText = ">";
 

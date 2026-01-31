@@ -42,6 +42,27 @@
     }
   },
   {
+    :Name: 'ModifierBg'
+    :Type: 'Image'
+    :Config: {
+      :File: 'modifier_bg.png'
+    }
+  },
+  {
+    :Name: 'ModifierBg'
+    :Type: 'Material'
+    :Config: {
+      :ShaderId: 'vres/sprite:Default'
+      :Uniforms: [
+        {
+          :Name: 'uTexture'
+          :Type: 'Texture2dRes'
+          :Value: 'images:ModifierBg'
+        }
+      ]
+    }
+  },
+  {
     :Name: 'Cursor'
     :Type: 'Image'
     :Config: {
