@@ -110,6 +110,115 @@ Ds::Vector<Level> nLevels;
 int nCurrentLevel = -1;
 void CreateLevels() {
   {
+    // Need Some Space
+    Level level;
+    level.mDigits = {
+      {{5, 3}, 2, Direction::Up},
+    };
+    level.mRequirements = {
+      {{5, 7}, 4},
+    };
+    level.mFilters = {
+      {{5, 5}, 2, Filter::Type::Add, false},
+    };
+    level.mShifters = {};
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    // Operation Order
+    Level level;
+    level.mDigits = {
+      {{2, 5}, 1, Direction::Right},
+    };
+    level.mRequirements = {
+      {{8, 5}, 9},
+    };
+    level.mFilters = {
+      {{5, 5}, 3, Filter::Type::Mul, false},
+      {{5, 5}, 6, Filter::Type::Add, true},
+    };
+    level.mShifters = {};
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    // Get Shifty
+    Level level;
+    level.mDigits = {
+      {{3, 8}, 3, Direction::Down},
+    };
+    level.mRequirements = {
+      {{6, 3}, 9},
+    };
+    level.mFilters = {
+      {{5, 3}, 3, Filter::Type::Mul, false},
+    };
+    level.mShifters = {
+      {{-1, -1}, Direction::Right, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    // Get Back
+    Level level;
+    level.mDigits = {
+      {{7, 6}, 0, Direction::Left},
+    };
+    level.mRequirements = {
+      {{5, 6}, 8},
+    };
+    level.mFilters = {
+      {{-1, -1}, 4, Filter::Type::Add, true},
+    };
+    level.mShifters = {
+      {{-1, -1}, Direction::Right, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    // Stay In Line
+    Level level;
+    level.mDigits = {
+      {{2, 2}, 4, Direction::Right},
+      {{7, 2}, 5, Direction::Left},
+    };
+    level.mRequirements = {
+      {{4, 7}, 8},
+      {{4, 6}, 4},
+    };
+    level.mFilters = {
+      {{4, 5}, 2, Filter::Type::Mul, false},
+      {{-1, -1}, 3, Filter::Type::Sub, true},
+    };
+    level.mShifters = {
+      {{-1, -1}, Direction::Up, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    // ABCDEF
+    Level level;
+    level.mDigits = {
+      {{6, 4}, 1, Direction::Up},
+    };
+    level.mRequirements = {
+      {{6, 6}, 7},
+    };
+    level.mFilters = {
+      {{-1, -1}, 1, Filter::Type::Add, true},
+    };
+    level.mShifters = {
+      {{6, 7}, Direction::Down, false},
+      {{-1, -1}, Direction::Up, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
     Level level;
     level.mDigits = {
       {{5, 3}, 1, Direction::Up},
