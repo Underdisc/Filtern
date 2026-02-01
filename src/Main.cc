@@ -58,9 +58,9 @@ const float nModifierScale = 0.7f;
 const float nPlaceableScale = 1.2f;
 const float nDigitScale = 0.6f;
 
-const Vec3 nPlaceableIdsOrigin = {12.0f, 7.0f, nModifierZ};
+const Vec3 nPlaceableIdsOrigin = {11.0f, 7.8f, nModifierZ};
 Ds::Vector<World::MemberId> nPlaceableIds;
-const int nPlaceableCols = 6;
+const int nPlaceableCols = 8;
 
 struct Cursor {
   World::Object mObject;
@@ -576,13 +576,29 @@ void FieldSetup() {
 
   nLevelDisplay = field.CreateChild();
   auto& levelDisplayTransform = nLevelDisplay.Add<Comp::Transform>();
-  levelDisplayTransform.SetTranslation({14.5f, 4.0f, 0.0f});
-  levelDisplayTransform.SetUniformScale(0.38f);
+  levelDisplayTransform.SetTranslation({14.5f, 4.2f, 0.0f});
+  levelDisplayTransform.SetUniformScale(0.4f);
   auto& levelDisplayText = nLevelDisplay.Add<Comp::Text>();
   levelDisplayText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   levelDisplayText.mAlign = Comp::Text::Alignment::Center;
   levelDisplayText.mWidth = 15.0f;
 
+  World::Object controlsDisplay = field.CreateChild();
+  auto& controlsTransform = controlsDisplay.Add<Comp::Transform>();
+  controlsTransform.SetTranslation({16.5f, 3.6f, 0.0f});
+  controlsTransform.SetUniformScale(0.35f);
+  auto& controlsText = controlsDisplay.Add<Comp::Text>();
+  controlsText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  controlsText.mAlign = Comp::Text::Alignment::Left;
+  controlsText.mWidth = 39.0f;
+  controlsText.mText =
+    "Space: Start/Stop Automata\n"
+    "R: Reset Digits\n"
+    "Arrow Keys: Move Cursor\n"
+    "S: Swap Cursor\n"
+    "D: Exchange/Remove/Select\n"
+    "B/N: Previous or Next Level\n"
+    "== Means Success";
 
   nCursor.mObject = space.CreateObject();
   auto& cursorTransform = nCursor.mObject.Add<Comp::Transform>();
