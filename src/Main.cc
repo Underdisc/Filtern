@@ -597,7 +597,7 @@ void FieldSetup() {
     "R: Reset Digits\n"
     "Arrow Keys: Move Cursor\n"
     "S: Swap Cursor\n"
-    "D: Exchange/Remove/Select\n"
+    "D: Select/Place/Exchange/Remove\n"
     "B/N: Previous or Next Level\n"
     "== Means Success";
 
