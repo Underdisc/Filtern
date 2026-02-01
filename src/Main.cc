@@ -45,11 +45,14 @@ constexpr int nFieldWidth = 10;
 constexpr int nFieldHeight = 10;
 World::MemberId nDigitLayer[nFieldWidth][nFieldHeight];
 World::MemberId nModifierLayer[nFieldWidth][nFieldHeight];
+World::MemberId nRequirementLayer[nFieldWidth][nFieldHeight];
 
 const float nCursorZ = -1.0f;
 const float nFieldZ = 0.0f;
 const float nModifierZ = 1.0f;
-const float nDigitZ = 2.0f;
+const float nRequirementZ = 2.0f;
+const float nDigitZ = 3.0f;
+const float nCameraZ = 4.0f;
 
 const float nModifierScale = 0.7f;
 const float nPlaceableScale = 1.2f;
@@ -71,13 +74,17 @@ Cursor nCursor;
 
 World::Object nRunDisplay;
 const char* nRunDisplayStartText = " =";
+bool nRequirementsFulfilled = false;
 
 struct Digit {
   int mCell[2];
   int mValue;
   Direction mDirection;
 };
-
+struct Requirement {
+  int mCell[2];
+  int mValue;
+};
 struct Filter {
   int mStartCell[2];
   int mValue;
@@ -85,7 +92,6 @@ struct Filter {
   Type mType;
   bool mPlaceable;
 };
-
 struct Shifter {
   int mStartCell[2];
   Direction mDirection;
@@ -94,6 +100,7 @@ struct Shifter {
 
 struct Level {
   Ds::Vector<Digit> mDigits;
+  Ds::Vector<Requirement> mRequirements;
   Ds::Vector<Filter> mFilters;
   Ds::Vector<Shifter> mShifters;
 };
@@ -124,6 +131,25 @@ void CreateLevels() {
         .mDirection = Direction::Left,
       },
     };
+    level.mRequirements =
+      {
+        {
+          .mCell = {5, 8},
+          .mValue = 0,
+        },
+        {
+          .mCell = {9, 4},
+          .mValue = 1,
+        },
+        {
+          .mCell = {5, 0},
+          .mValue = 2,
+        },
+        {
+          .mCell = {1, 4},
+          .mValue = 3,
+        },
+      },
     level.mFilters = {
       {
         .mStartCell = {-1, -1},
@@ -181,6 +207,7 @@ void InitializeLayers() {
     for (int j = 0; j < 10; ++j) {
       nDigitLayer[j][i] = World::nInvalidMemberId;
       nModifierLayer[j][i] = World::nInvalidMemberId;
+      nRequirementLayer[j][i] = World::nInvalidMemberId;
     }
   }
 }
@@ -253,6 +280,7 @@ void PerformStep() {
     }
     digit.mCell[0] = Math::Clamp(0, 9, digit.mCell[0]);
     digit.mCell[1] = Math::Clamp(0, 9, digit.mCell[1]);
+    nDigitLayer[digit.mCell[0]][digit.mCell[1]] = memberId;
 
     World::MemberId modifierMemberId =
       nModifierLayer[digit.mCell[0]][digit.mCell[1]];
@@ -286,6 +314,26 @@ void PerformStep() {
   }
 }
 
+void CheckRequirements() {
+  World::Space& space = World::nLayers.Back()->mSpace;
+  Ds::Vector<World::MemberId> requirementIds = space.Slice<Requirement>();
+  for (World::MemberId requirementId: requirementIds) {
+    const auto& req = space.Get<Requirement>(requirementId);
+    World::MemberId digitIdAtReq = nDigitLayer[req.mCell[0]][req.mCell[1]];
+    if (digitIdAtReq == World::nInvalidMemberId) {
+      return;
+    }
+    const auto& digit = space.Get<Digit>(digitIdAtReq);
+    if (digit.mValue != req.mValue) {
+      return;
+    }
+  }
+
+  nRunDisplay.Get<Comp::Text>().mText = "==";
+  nPaused = true;
+  nRequirementsFulfilled = true;
+}
+
 void RunAutomata() {
   int prevTimePassedFloor = (int)nAutomataTimePassed;
   nAutomataTimePassed += Temporal::DeltaTime();
@@ -293,6 +341,7 @@ void RunAutomata() {
   if (prevTimePassedFloor != currTimePassedFloor) {
     PerformStep();
     UpdateGraphics();
+    CheckRequirements();
   }
 }
 
@@ -416,15 +465,29 @@ void RunPlaceMode() {
 }
 
 void CentralUpdate() {
+  if (Input::KeyPressed(Input::Key::R)) {
+    nPaused = true;
+    nAutomataStarted = false;
+    nAutomataTimePassed = nStartTime;
+    nRunDisplay.Get<Comp::Text>().mText = nRunDisplayStartText;
+    nCursor.mObject.Get<Comp::Sprite>().mVisible = true;
+    nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
+    LevelSetup(nCurrentLevel);
+  }
+
+  if (nRequirementsFulfilled) {
+    return;
+  }
+
   if (Input::KeyPressed(Input::Key::Space)) {
     nPaused = !nPaused;
     if (nPaused) {
-      nRunDisplay.Get<Comp::Text>().mText = "o=";
+      nRunDisplay.Get<Comp::Text>().mText = "~=";
       nAutomataTimePassed = (float)(int)nAutomataTimePassed + 0.9f;
     }
     else {
       nAutomataStarted = true;
-      nRunDisplay.Get<Comp::Text>().mText = "o>";
+      nRunDisplay.Get<Comp::Text>().mText = "~>";
       nCursor.mObject.Get<Comp::Sprite>().mVisible = false;
       nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
     }
@@ -435,16 +498,6 @@ void CentralUpdate() {
   }
   else if (!nAutomataStarted) {
     RunPlaceMode();
-  }
-
-  if (Input::KeyPressed(Input::Key::R)) {
-    nPaused = true;
-    nAutomataStarted = false;
-    nAutomataTimePassed = nStartTime;
-    nRunDisplay.Get<Comp::Text>().mText = nRunDisplayStartText;
-    nCursor.mObject.Get<Comp::Sprite>().mVisible = true;
-    nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
-    LevelSetup(nCurrentLevel);
   }
 }
 
@@ -505,13 +558,17 @@ void FieldSetup() {
   cameraComp.mHeight = 11.0f;
   layerIt->mCameraId = camera.mMemberId;
   auto& cameraTransform = camera.Get<Comp::Transform>();
-  cameraTransform.SetTranslation({9.0f, 4.5f, 3.0f});
+  cameraTransform.SetTranslation({9.0f, 4.5f, nCameraZ});
 }
 
 void MakeLevelEmpty() {
   World::Space& space = World::nLayers.Back()->mSpace;
   Ds::Vector<MemberId> digitMemberIds = space.Slice<Digit>();
   for (MemberId memberId: digitMemberIds) {
+    space.DeleteMember(memberId);
+  }
+  Ds::Vector<MemberId> requirementIds = space.Slice<Requirement>();
+  for (MemberId memberId: requirementIds) {
     space.DeleteMember(memberId);
   }
   Ds::Vector<MemberId> filterMemberIds = space.Slice<Filter>();
@@ -524,6 +581,7 @@ void MakeLevelEmpty() {
   }
   InitializeLayers();
   nPlaceableIds.Clear();
+  nRequirementsFulfilled = false;
 }
 
 void LevelSetup(size_t levelIdx) {
@@ -557,6 +615,27 @@ void LevelSetup(size_t levelIdx) {
     arrowText.mAlign = Comp::Text::Alignment::Center;
     arrowText.mText = ">";
     UpdateDigitArrowGraphic(digitObject.mMemberId);
+  }
+
+  for (const Requirement& requirement: level.mRequirements) {
+    World::Object requirementObject = space.CreateObject();
+    requirementObject.Add<Requirement>() = requirement;
+    auto& transform = requirementObject.Add<Comp::Transform>();
+    Vec3 offset = {
+      (float)requirement.mCell[0], (float)requirement.mCell[1], nRequirementZ};
+    transform.SetTranslation(nFieldOrigin + offset);
+    transform.SetUniformScale(nDigitScale);
+    auto& sprite = requirementObject.Add<Comp::Sprite>();
+    sprite.mMaterialId = "images:RequirementBg";
+
+    World::Object textChildObject = requirementObject.CreateChild();
+    auto& textTransform = textChildObject.Add<Comp::Transform>();
+    textTransform.SetTranslation({0.0f, -0.2f, 0.1f});
+    textTransform.SetUniformScale(0.4f);
+    auto& text = textChildObject.Add<Comp::Text>();
+    text.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    text.mAlign = Comp::Text::Alignment::Center;
+    text.mText = std::to_string(requirement.mValue);
   }
 
   for (const Filter& filter: level.mFilters) {
@@ -635,6 +714,11 @@ void LevelSetup(size_t levelIdx) {
     auto& digit = space.Get<Digit>(memberId);
     nDigitLayer[digit.mCell[0]][digit.mCell[1]] = memberId;
   }
+  Ds::Vector<MemberId> requirementIds = space.Slice<Requirement>();
+  for (MemberId memberId: requirementIds) {
+    auto& requirement = space.Get<Requirement>(memberId);
+    nRequirementLayer[requirement.mCell[0]][requirement.mCell[1]] = memberId;
+  }
   Ds::Vector<MemberId> filterIds = space.Slice<Filter>();
   for (MemberId memberId: filterIds) {
     auto& filter = space.Get<Filter>(memberId);
@@ -653,6 +737,7 @@ void LevelSetup(size_t levelIdx) {
 
 void RegisterCustomTypes() {
   RegisterComponent(Digit);
+  RegisterComponent(Requirement);
   RegisterComponent(Filter);
   RegisterComponent(Shifter);
 }
