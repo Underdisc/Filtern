@@ -134,7 +134,7 @@ void CreateLevels() {
     level.mRequirements =
       {
         {
-          .mCell = {5, 8},
+          .mCell = {5, 7},
           .mValue = 0,
         },
         {
@@ -164,10 +164,10 @@ void CreateLevels() {
         .mPlaceable = true,
       },
       {
-        .mStartCell = {-1, -1},
+        .mStartCell = {2, 2},
         .mValue = 3,
         .mType = Filter::Type::Mul,
-        .mPlaceable = true,
+        .mPlaceable = false,
       },
       {
         .mStartCell = {-1, -1},
@@ -193,9 +193,9 @@ void CreateLevels() {
         .mPlaceable = true,
       },
       {
-        .mStartCell = {-1, -1},
+        .mStartCell = {8, 8},
         .mDirection = Direction::Right,
-        .mPlaceable = true,
+        .mPlaceable = false,
       },
     };
     nLevels.Emplace(std::move(level));
@@ -345,21 +345,53 @@ void RunAutomata() {
   }
 }
 
-void TryRemoveModifierFromField(World::MemberId memberId) {
+void TryPlaceModifier() {
+  // Can't place modifiers on digits at their starting position.
+  bool digitExists =
+    nDigitLayer[nCursor.mCell[0]][nCursor.mCell[1]] != World::nInvalidMemberId;
+  if (digitExists) {
+    return;
+  }
+
+  // Can't place modifiers on modifiers aren't placeable.
   World::Space& space = World::nLayers.Back()->mSpace;
-  if (memberId != World::nInvalidMemberId) {
-    auto* filter = space.TryGet<Filter>(memberId);
+  World::MemberId modifierIdUnderCursor =
+    nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]];
+  auto* filter = space.TryGet<Filter>(modifierIdUnderCursor);
+  if (modifierIdUnderCursor != World::nInvalidMemberId) {
     if (filter != nullptr && !filter->mPlaceable) {
       return;
     }
-    auto* shifter = space.TryGet<Shifter>(memberId);
+    auto* shifter = space.TryGet<Shifter>(modifierIdUnderCursor);
     if (shifter != nullptr && !shifter->mPlaceable) {
       return;
     }
-    nPlaceableIds.Push(memberId);
+    nPlaceableIds.Push(modifierIdUnderCursor);
     nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]] =
       World::nInvalidMemberId;
   }
+
+  // Can't place on requirements.
+  World::MemberId requirementIdUnderCursor =
+    nRequirementLayer[nCursor.mCell[0]][nCursor.mCell[1]];
+  if (requirementIdUnderCursor != World::nInvalidMemberId) {
+    return;
+  }
+
+  if (nCursor.mPlaceableSelected) {
+    size_t placeableIndex =
+      nCursor.mPlaceableCell[0] + (nCursor.mPlaceableCell[1] * 6);
+    World::MemberId placeableId = nPlaceableIds[placeableIndex];
+    nPlaceableIds.Remove(placeableIndex);
+    auto& placeableTransform = space.Get<Comp::Transform>(placeableId);
+    Vec3 offset = {
+      (float)nCursor.mCell[0], (float)nCursor.mCell[1], nModifierZ};
+    placeableTransform.SetTranslation(nFieldOrigin + offset);
+    nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]] = placeableId;
+    nCursor.mPlaceableSelected = false;
+    nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
+  }
+  UpdatePlaceableGraphics();
 }
 
 void RunPlaceMode() {
@@ -384,25 +416,7 @@ void RunPlaceMode() {
       nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = true;
     }
     else {
-      World::MemberId modifierIdUnderCursor =
-        nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]];
-      TryRemoveModifierFromField(modifierIdUnderCursor);
-      bool noDigit = nDigitLayer[nCursor.mCell[0]][nCursor.mCell[1]] ==
-        World::nInvalidMemberId;
-      if (nCursor.mPlaceableSelected && noDigit) {
-        size_t placeableIndex =
-          nCursor.mPlaceableCell[0] + (nCursor.mPlaceableCell[1] * 6);
-        World::MemberId placeableId = nPlaceableIds[placeableIndex];
-        nPlaceableIds.Remove(placeableIndex);
-        auto& placeableTransform = space.Get<Comp::Transform>(placeableId);
-        Vec3 offset = {
-          (float)nCursor.mCell[0], (float)nCursor.mCell[1], nModifierZ};
-        placeableTransform.SetTranslation(nFieldOrigin + offset);
-        nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]] = placeableId;
-        nCursor.mPlaceableSelected = false;
-        nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
-      }
-      UpdatePlaceableGraphics();
+      TryPlaceModifier();
     }
   }
 
@@ -584,6 +598,42 @@ void MakeLevelEmpty() {
   nRequirementsFulfilled = false;
 }
 
+void AddLockingSprites(World::Object modifierObject) {
+  // Indicate that modifiers which are not placeable cannot be moved.
+  for (int i = 0; i < 4; ++i) {
+    World::Object lockedSpriteId = modifierObject.CreateChild();
+    auto& transform = lockedSpriteId.Add<Comp::Transform>();
+    float direction[2] = {0, 0};
+    switch (i) {
+    case 0:
+      direction[0] = 1.0f;
+      direction[1] = 1.0f;
+      break;
+    case 1:
+      direction[0] = 1.0f;
+      direction[1] = -1.0f;
+      break;
+    case 2:
+      direction[0] = -1.0f;
+      direction[1] = -1.0f;
+      break;
+    case 3:
+      direction[0] = -1.0f;
+      direction[1] = 1.0f;
+      break;
+    }
+    direction[0] *= 0.4f;
+    direction[1] *= 0.4f;
+
+    Vec3 offset = {direction[0], direction[1], 0.1f};
+    transform.SetTranslation(offset);
+    transform.SetUniformScale(0.2f);
+
+    auto& sprite = lockedSpriteId.Add<Comp::Sprite>();
+    sprite.mMaterialId = "images:GridMaterial";
+  }
+}
+
 void LevelSetup(size_t levelIdx) {
   MakeLevelEmpty();
   World::Space& space = World::nLayers.Back()->mSpace;
@@ -668,6 +718,9 @@ void LevelSetup(size_t levelIdx) {
     if (filter.mPlaceable) {
       nPlaceableIds.Push(filterObject.mMemberId);
     }
+    else {
+      AddLockingSprites(filterObject);
+    }
   }
 
   for (const Shifter& shifter: level.mShifters) {
@@ -704,6 +757,9 @@ void LevelSetup(size_t levelIdx) {
 
     if (shifter.mPlaceable) {
       nPlaceableIds.Push(shifterObject.mMemberId);
+    }
+    else {
+      AddLockingSprites(shifterObject);
     }
   }
 
