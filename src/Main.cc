@@ -227,6 +227,7 @@ void UpdateDigitArrowGraphic(World::MemberId digitMemberId) {
     break;
   case Direction::Right:
     arrowTransform.SetTranslation({0.3f, -0.15f, 0.1f});
+    arrowTransform.SetRotation(Quat::AngleAxis(0.0f, {0.0f, 0.0f, 1.0f}));
     break;
   case Direction::Down:
     arrowTransform.SetTranslation({-0.15f, -0.3f, 0.1f});
