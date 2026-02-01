@@ -309,7 +309,9 @@ void RunPlaceMode() {
       World::MemberId modifierIdUnderCursor =
         nModifierLayer[nCursor.mCell[0]][nCursor.mCell[1]];
       TryRemoveModifierFromField(modifierIdUnderCursor);
-      if (nCursor.mPlaceableSelected) {
+      bool noDigit = nDigitLayer[nCursor.mCell[0]][nCursor.mCell[1]] ==
+        World::nInvalidMemberId;
+      if (nCursor.mPlaceableSelected && noDigit) {
         size_t placeableIndex =
           nCursor.mPlaceableCell[0] + (nCursor.mPlaceableCell[1] * 6);
         World::MemberId placeableId = nPlaceableIds[placeableIndex];
