@@ -102,6 +102,7 @@ struct Shifter {
 };
 
 struct Level {
+  std::string mName;
   Ds::Vector<Digit> mDigits;
   Ds::Vector<Requirement> mRequirements;
   Ds::Vector<Filter> mFilters;
@@ -111,8 +112,8 @@ Ds::Vector<Level> nLevels;
 int nCurrentLevel = -1;
 void CreateLevels() {
   {
-    // Need Some Space
     Level level;
+    level.mName = "Need Some Space";
     level.mDigits = {
       {{5, 3}, 2, Direction::Up},
     };
@@ -127,8 +128,8 @@ void CreateLevels() {
   }
 
   {
-    // Operation Order
     Level level;
+    level.mName = "Operation Order";
     level.mDigits = {
       {{2, 5}, 1, Direction::Right},
     };
@@ -144,8 +145,8 @@ void CreateLevels() {
   }
 
   {
-    // Get Shifty
     Level level;
+    level.mName = "Get Shifty";
     level.mDigits = {
       {{3, 8}, 3, Direction::Down},
     };
@@ -162,8 +163,8 @@ void CreateLevels() {
   }
 
   {
-    // Get Back
     Level level;
+    level.mName = "Get Back";
     level.mDigits = {
       {{7, 6}, 0, Direction::Left},
     };
@@ -180,8 +181,8 @@ void CreateLevels() {
   }
 
   {
-    // Stay In Line
     Level level;
+    level.mName = "Stay In Line";
     level.mDigits = {
       {{2, 2}, 4, Direction::Right},
       {{7, 2}, 5, Direction::Left},
@@ -201,8 +202,8 @@ void CreateLevels() {
   }
 
   {
-    // ABCDEF
     Level level;
+    level.mName = "ABC...";
     level.mDigits = {
       {{6, 4}, 1, Direction::Up},
     };
@@ -581,7 +582,7 @@ void FieldSetup() {
   auto& levelDisplayText = nLevelDisplay.Add<Comp::Text>();
   levelDisplayText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   levelDisplayText.mAlign = Comp::Text::Alignment::Center;
-  levelDisplayText.mWidth = 15.0f;
+  levelDisplayText.mWidth = 30.0f;
 
   World::Object controlsDisplay = field.CreateChild();
   auto& controlsTransform = controlsDisplay.Add<Comp::Transform>();
@@ -696,16 +697,17 @@ void AddLockingSprites(World::Object modifierObject) {
 void LevelSetup(size_t levelIdx) {
   bool resetModifiers = nCurrentLevel != levelIdx;
   nCurrentLevel = levelIdx;
-  std::string levelText = "B <- Level ";
+  const Level& level = nLevels[levelIdx];
+  std::string levelText = "Level ";
   levelText += std::to_string(nCurrentLevel + 1);
   levelText += "/";
   levelText += std::to_string(nLevels.Size());
-  levelText += " -> N";
+  levelText += ": ";
+  levelText += level.mName;
   nLevelDisplay.Get<Comp::Text>().mText = levelText;
 
   MakeLevelEmpty(resetModifiers);
   World::Space& space = World::nLayers.Back()->mSpace;
-  const Level& level = nLevels[levelIdx];
   for (const Digit& digit: level.mDigits) {
     World::Object digitObject = space.CreateObject();
     digitObject.Add<Digit>() = digit;
