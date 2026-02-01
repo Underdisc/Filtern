@@ -105,7 +105,7 @@ struct Level {
   Ds::Vector<Shifter> mShifters;
 };
 Ds::Vector<Level> nLevels;
-size_t nCurrentLevel = 0;
+int nCurrentLevel = -1;
 void CreateLevels() {
   {
     Level level;
@@ -202,11 +202,13 @@ void CreateLevels() {
   }
 }
 
-void InitializeLayers() {
+void InitializeLayers(bool resetModifiers) {
   for (int i = 0; i < 10; ++i) {
     for (int j = 0; j < 10; ++j) {
       nDigitLayer[j][i] = World::nInvalidMemberId;
-      nModifierLayer[j][i] = World::nInvalidMemberId;
+      if (resetModifiers) {
+        nModifierLayer[j][i] = World::nInvalidMemberId;
+      }
       nRequirementLayer[j][i] = World::nInvalidMemberId;
     }
   }
@@ -576,8 +578,11 @@ void FieldSetup() {
   cameraTransform.SetTranslation({9.0f, 4.5f, nCameraZ});
 }
 
-void MakeLevelEmpty() {
+void MakeLevelEmpty(bool resetModifiers) {
   World::Space& space = World::nLayers.Back()->mSpace;
+  nRequirementsFulfilled = false;
+  InitializeLayers(resetModifiers);
+
   Ds::Vector<MemberId> digitMemberIds = space.Slice<Digit>();
   for (MemberId memberId: digitMemberIds) {
     space.DeleteMember(memberId);
@@ -586,17 +591,18 @@ void MakeLevelEmpty() {
   for (MemberId memberId: requirementIds) {
     space.DeleteMember(memberId);
   }
-  Ds::Vector<MemberId> filterMemberIds = space.Slice<Filter>();
-  for (MemberId memberId: filterMemberIds) {
-    space.DeleteMember(memberId);
+
+  if (resetModifiers) {
+    Ds::Vector<MemberId> filterMemberIds = space.Slice<Filter>();
+    for (MemberId memberId: filterMemberIds) {
+      space.DeleteMember(memberId);
+    }
+    Ds::Vector<MemberId> shifterMemberIds = space.Slice<Shifter>();
+    for (MemberId memberId: shifterMemberIds) {
+      space.DeleteMember(memberId);
+    }
+    nPlaceableIds.Clear();
   }
-  Ds::Vector<MemberId> shifterMemberIds = space.Slice<Shifter>();
-  for (MemberId memberId: shifterMemberIds) {
-    space.DeleteMember(memberId);
-  }
-  InitializeLayers();
-  nPlaceableIds.Clear();
-  nRequirementsFulfilled = false;
 }
 
 void AddLockingSprites(World::Object modifierObject) {
@@ -636,7 +642,10 @@ void AddLockingSprites(World::Object modifierObject) {
 }
 
 void LevelSetup(size_t levelIdx) {
-  MakeLevelEmpty();
+  bool resetModifiers = nCurrentLevel != levelIdx;
+  nCurrentLevel = levelIdx;
+  MakeLevelEmpty(resetModifiers);
+
   World::Space& space = World::nLayers.Back()->mSpace;
   const Level& level = nLevels[levelIdx];
   for (const Digit& digit: level.mDigits) {
@@ -689,82 +698,84 @@ void LevelSetup(size_t levelIdx) {
     text.mText = std::to_string(requirement.mValue);
   }
 
-  for (const Filter& filter: level.mFilters) {
-    World::Object filterObject = space.CreateObject();
-    filterObject.Add<Filter>() = filter;
-    auto& transform = filterObject.Add<Comp::Transform>();
-    Vec3 offset = {
-      (float)filter.mStartCell[0], (float)filter.mStartCell[1], nModifierZ};
-    transform.SetTranslation(nFieldOrigin + offset);
-    transform.SetUniformScale(nModifierScale);
-    auto& sprite = filterObject.Add<Comp::Sprite>();
-    sprite.mMaterialId = "images:ModifierBg";
+  if (resetModifiers) {
+    for (const Filter& filter: level.mFilters) {
+      World::Object filterObject = space.CreateObject();
+      filterObject.Add<Filter>() = filter;
+      auto& transform = filterObject.Add<Comp::Transform>();
+      Vec3 offset = {
+        (float)filter.mStartCell[0], (float)filter.mStartCell[1], nModifierZ};
+      transform.SetTranslation(nFieldOrigin + offset);
+      transform.SetUniformScale(nModifierScale);
+      auto& sprite = filterObject.Add<Comp::Sprite>();
+      sprite.mMaterialId = "images:ModifierBg";
 
-    World::Object textChildObject = filterObject.CreateChild();
-    auto& textTransform = textChildObject.Add<Comp::Transform>();
-    textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
-    textTransform.SetUniformScale(0.5f);
-    auto& text = textChildObject.Add<Comp::Text>();
-    text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    text.mAlign = Comp::Text::Alignment::Center;
-    std::string filterChar = "";
-    switch (filter.mType) {
-    case Filter::Type::Add: filterChar = "+"; break;
-    case Filter::Type::Sub: filterChar = "-"; break;
-    case Filter::Type::Mul: filterChar = "*"; break;
-    case Filter::Type::Mod: filterChar = "%"; break;
-    }
-    text.mText = filterChar + std::to_string(filter.mValue);
+      World::Object textChildObject = filterObject.CreateChild();
+      auto& textTransform = textChildObject.Add<Comp::Transform>();
+      textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
+      textTransform.SetUniformScale(0.5f);
+      auto& text = textChildObject.Add<Comp::Text>();
+      text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
+      text.mAlign = Comp::Text::Alignment::Center;
+      std::string filterChar = "";
+      switch (filter.mType) {
+      case Filter::Type::Add: filterChar = "+"; break;
+      case Filter::Type::Sub: filterChar = "-"; break;
+      case Filter::Type::Mul: filterChar = "*"; break;
+      case Filter::Type::Mod: filterChar = "%"; break;
+      }
+      text.mText = filterChar + std::to_string(filter.mValue);
 
-    if (filter.mPlaceable) {
-      nPlaceableIds.Push(filterObject.mMemberId);
+      if (filter.mPlaceable) {
+        nPlaceableIds.Push(filterObject.mMemberId);
+      }
+      else {
+        AddLockingSprites(filterObject);
+      }
     }
-    else {
-      AddLockingSprites(filterObject);
+
+    for (const Shifter& shifter: level.mShifters) {
+      World::Object shifterObject = space.CreateObject();
+      shifterObject.Add<Shifter>() = shifter;
+      auto& transform = shifterObject.Add<Comp::Transform>();
+      Vec3 offset = {
+        (float)shifter.mStartCell[0], (float)shifter.mStartCell[1], nModifierZ};
+      transform.SetTranslation(nFieldOrigin + offset);
+      transform.SetUniformScale(nModifierScale);
+      auto& sprite = shifterObject.Add<Comp::Sprite>();
+      sprite.mMaterialId = "images:ModifierBg";
+
+      World::Object textChildObject = shifterObject.CreateChild();
+      auto& textTransform = textChildObject.Add<Comp::Transform>();
+      textTransform.SetTranslation({0.0f, -0.35f, 0.1f});
+      textTransform.SetUniformScale(0.7f);
+      switch (shifter.mDirection) {
+      case Direction::Up:
+        transform.SetRotation(Quat::AngleAxis(Math::nPiO2, {0.0f, 0.0f, 1.0f}));
+        break;
+      case Direction::Right: break;
+      case Direction::Down:
+        transform.SetRotation(
+          Quat::AngleAxis(-Math::nPiO2, {0.0f, 0.0f, 1.0f}));
+        break;
+      case Direction::Left:
+        transform.SetRotation(Quat::AngleAxis(Math::nPi, {0.0f, 0.0f, 1.0f}));
+        break;
+      }
+      auto& text = textChildObject.Add<Comp::Text>();
+      text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
+      text.mAlign = Comp::Text::Alignment::Center;
+      text.mText = ">";
+
+      if (shifter.mPlaceable) {
+        nPlaceableIds.Push(shifterObject.mMemberId);
+      }
+      else {
+        AddLockingSprites(shifterObject);
+      }
     }
+    UpdatePlaceableGraphics();
   }
-
-  for (const Shifter& shifter: level.mShifters) {
-    World::Object shifterObject = space.CreateObject();
-    shifterObject.Add<Shifter>() = shifter;
-    auto& transform = shifterObject.Add<Comp::Transform>();
-    Vec3 offset = {
-      (float)shifter.mStartCell[0], (float)shifter.mStartCell[1], nModifierZ};
-    transform.SetTranslation(nFieldOrigin + offset);
-    transform.SetUniformScale(nModifierScale);
-    auto& sprite = shifterObject.Add<Comp::Sprite>();
-    sprite.mMaterialId = "images:ModifierBg";
-
-    World::Object textChildObject = shifterObject.CreateChild();
-    auto& textTransform = textChildObject.Add<Comp::Transform>();
-    textTransform.SetTranslation({0.0f, -0.35f, 0.1f});
-    textTransform.SetUniformScale(0.7f);
-    switch (shifter.mDirection) {
-    case Direction::Up:
-      transform.SetRotation(Quat::AngleAxis(Math::nPiO2, {0.0f, 0.0f, 1.0f}));
-      break;
-    case Direction::Right: break;
-    case Direction::Down:
-      transform.SetRotation(Quat::AngleAxis(-Math::nPiO2, {0.0f, 0.0f, 1.0f}));
-      break;
-    case Direction::Left:
-      transform.SetRotation(Quat::AngleAxis(Math::nPi, {0.0f, 0.0f, 1.0f}));
-      break;
-    }
-    auto& text = textChildObject.Add<Comp::Text>();
-    text.mColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    text.mAlign = Comp::Text::Alignment::Center;
-    text.mText = ">";
-
-    if (shifter.mPlaceable) {
-      nPlaceableIds.Push(shifterObject.mMemberId);
-    }
-    else {
-      AddLockingSprites(shifterObject);
-    }
-  }
-
-  UpdatePlaceableGraphics();
 
   Ds::Vector<MemberId> digitIds = space.Slice<Digit>();
   for (MemberId memberId: digitIds) {
@@ -776,18 +787,20 @@ void LevelSetup(size_t levelIdx) {
     auto& requirement = space.Get<Requirement>(memberId);
     nRequirementLayer[requirement.mCell[0]][requirement.mCell[1]] = memberId;
   }
-  Ds::Vector<MemberId> filterIds = space.Slice<Filter>();
-  for (MemberId memberId: filterIds) {
-    auto& filter = space.Get<Filter>(memberId);
-    if (!filter.mPlaceable) {
-      nModifierLayer[filter.mStartCell[0]][filter.mStartCell[1]] = memberId;
+  if (resetModifiers) {
+    Ds::Vector<MemberId> filterIds = space.Slice<Filter>();
+    for (MemberId memberId: filterIds) {
+      auto& filter = space.Get<Filter>(memberId);
+      if (!filter.mPlaceable) {
+        nModifierLayer[filter.mStartCell[0]][filter.mStartCell[1]] = memberId;
+      }
     }
-  }
-  Ds::Vector<MemberId> shifterIds = space.Slice<Shifter>();
-  for (MemberId memberId: shifterIds) {
-    auto& shifter = space.Get<Shifter>(memberId);
-    if (!shifter.mPlaceable) {
-      nModifierLayer[shifter.mStartCell[0]][shifter.mStartCell[1]] = memberId;
+    Ds::Vector<MemberId> shifterIds = space.Slice<Shifter>();
+    for (MemberId memberId: shifterIds) {
+      auto& shifter = space.Get<Shifter>(memberId);
+      if (!shifter.mPlaceable) {
+        nModifierLayer[shifter.mStartCell[0]][shifter.mStartCell[1]] = memberId;
+      }
     }
   }
 }
@@ -809,7 +822,6 @@ int main(int argc, char* argv[]) {
   LogAbortIf(!result.Success(), result.mError.c_str());
 
   CreateLevels();
-  InitializeLayers();
   FieldSetup();
   LevelSetup(0);
   World::nCentralUpdate = CentralUpdate;
