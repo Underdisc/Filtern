@@ -40,6 +40,7 @@ void LevelSetup(size_t levelIdx);
 bool nPaused = true;
 bool nAutomataStarted = false;
 const float nStartTime = 0.9f;
+constexpr float nSpeedScale = 1.8f;
 float nAutomataTimePassed = nStartTime;
 const Vec3 nFieldOrigin = {0.0f, 0.0f, 0.0f};
 constexpr int nFieldWidth = 10;
@@ -356,7 +357,7 @@ void CheckRequirements() {
 
 void RunAutomata() {
   int prevTimePassedFloor = (int)nAutomataTimePassed;
-  nAutomataTimePassed += Temporal::DeltaTime();
+  nAutomataTimePassed += nSpeedScale * Temporal::DeltaTime();
   int currTimePassedFloor = (int)nAutomataTimePassed;
   if (prevTimePassedFloor != currTimePassedFloor) {
     PerformStep();
