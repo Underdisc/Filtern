@@ -185,6 +185,34 @@ void InitializeLayers() {
   }
 }
 
+void UpdateDigitArrowGraphic(World::MemberId digitMemberId) {
+  World::Space& space = World::nLayers.Back()->mSpace;
+  const Digit& digit = space.Get<Digit>(digitMemberId);
+  const Comp::Relationship& relationship =
+    space.Get<Comp::Relationship>(digitMemberId);
+  World::MemberId arrowMemberId = relationship.mChildren[1];
+  auto& arrowTransform = space.Get<Comp::Transform>(arrowMemberId);
+  switch (digit.mDirection) {
+  case Direction::Up:
+    arrowTransform.SetTranslation({0.15f, 0.3f, 0.1f});
+    arrowTransform.SetRotation(
+      Quat::AngleAxis(Math::nPiO2, {0.0f, 0.0f, 1.0f}));
+    break;
+  case Direction::Right:
+    arrowTransform.SetTranslation({0.3f, -0.15f, 0.1f});
+    break;
+  case Direction::Down:
+    arrowTransform.SetTranslation({-0.15f, -0.3f, 0.1f});
+    arrowTransform.SetRotation(
+      Quat::AngleAxis(-Math::nPiO2, {0.0f, 0.0f, 1.0f}));
+    break;
+  case Direction::Left:
+    arrowTransform.SetTranslation({-0.3f, 0.15f, 0.1f});
+    arrowTransform.SetRotation(Quat::AngleAxis(Math::nPi, {0.0f, 0.0f, 1.0f}));
+    break;
+  }
+}
+
 void UpdatePlaceableGraphics() {
   World::Space& space = World::nLayers.Back()->mSpace;
   for (size_t i = 0; i < nPlaceableIds.Size(); ++i) {
@@ -235,6 +263,7 @@ void PerformStep() {
     auto* shifter = modifierObj.TryGet<Shifter>();
     if (shifter != nullptr) {
       digit.mDirection = shifter->mDirection;
+      UpdateDigitArrowGraphic(memberId);
     }
     auto* filter = modifierObj.TryGet<Filter>();
     if (filter != nullptr) {
@@ -513,12 +542,21 @@ void LevelSetup(size_t levelIdx) {
 
     World::Object textChildObject = digitObject.CreateChild();
     auto& textTransform = textChildObject.Add<Comp::Transform>();
-    textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
-    textTransform.SetUniformScale(0.5f);
+    textTransform.SetTranslation({0.0f, -0.2f, 0.1f});
+    textTransform.SetUniformScale(0.4f);
     auto& text = textChildObject.Add<Comp::Text>();
     text.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
     text.mAlign = Comp::Text::Alignment::Center;
     text.mText = std::to_string(digit.mValue);
+
+    World::Object arrowChildObject = digitObject.CreateChild();
+    auto& arrowTransform = arrowChildObject.Add<Comp::Transform>();
+    arrowTransform.SetUniformScale(0.3f);
+    auto& arrowText = arrowChildObject.Add<Comp::Text>();
+    arrowText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    arrowText.mAlign = Comp::Text::Alignment::Center;
+    arrowText.mText = ">";
+    UpdateDigitArrowGraphic(digitObject.mMemberId);
   }
 
   for (const Filter& filter: level.mFilters) {
@@ -566,7 +604,7 @@ void LevelSetup(size_t levelIdx) {
 
     World::Object textChildObject = shifterObject.CreateChild();
     auto& textTransform = textChildObject.Add<Comp::Transform>();
-    textTransform.SetTranslation({0.0f, -0.25f, 0.1f});
+    textTransform.SetTranslation({0.0f, -0.35f, 0.1f});
     textTransform.SetUniformScale(0.7f);
     switch (shifter.mDirection) {
     case Direction::Up:
