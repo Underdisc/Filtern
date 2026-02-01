@@ -74,6 +74,7 @@ Cursor nCursor;
 
 World::Object nRunDisplay;
 const char* nRunDisplayStartText = " =";
+World::Object nLevelDisplay;
 bool nRequirementsFulfilled = false;
 
 struct Digit {
@@ -107,6 +108,23 @@ struct Level {
 Ds::Vector<Level> nLevels;
 int nCurrentLevel = -1;
 void CreateLevels() {
+  {
+    Level level;
+    level.mDigits = {
+      {{5, 3}, 1, Direction::Up},
+    };
+    level.mRequirements = {
+      {{0, 8}, 4},
+    };
+    level.mFilters = {
+      {{-1, -1}, 3, Filter::Type::Add, true},
+    };
+    level.mShifters = {
+      {{-1, -1}, Direction::Left, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
   {
     Level level;
     level.mDigits = {
@@ -482,14 +500,22 @@ void RunPlaceMode() {
 }
 
 void CentralUpdate() {
-  if (Input::KeyPressed(Input::Key::R)) {
+  bool newLevel = nCurrentLevel;
+  if (Input::KeyPressed(Input::Key::N)) {
+    newLevel = Math::Clamp(0, (int)nLevels.Size() - 1, nCurrentLevel + 1);
+  }
+  if (Input::KeyPressed(Input::Key::B)) {
+    newLevel = Math::Clamp(0, (int)nLevels.Size() - 1, nCurrentLevel - 1);
+  }
+
+  if (Input::KeyPressed(Input::Key::R) || newLevel != nCurrentLevel) {
     nPaused = true;
     nAutomataStarted = false;
     nAutomataTimePassed = nStartTime;
     nRunDisplay.Get<Comp::Text>().mText = nRunDisplayStartText;
     nCursor.mObject.Get<Comp::Sprite>().mVisible = true;
     nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
-    LevelSetup(nCurrentLevel);
+    LevelSetup(newLevel);
   }
 
   if (nRequirementsFulfilled) {
@@ -547,6 +573,16 @@ void FieldSetup() {
   runDisplayText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   runDisplayText.mAlign = Comp::Text::Alignment::Center;
   runDisplayText.mText = nRunDisplayStartText;
+
+  nLevelDisplay = field.CreateChild();
+  auto& levelDisplayTransform = nLevelDisplay.Add<Comp::Transform>();
+  levelDisplayTransform.SetTranslation({14.5f, 4.0f, 0.0f});
+  levelDisplayTransform.SetUniformScale(0.38f);
+  auto& levelDisplayText = nLevelDisplay.Add<Comp::Text>();
+  levelDisplayText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  levelDisplayText.mAlign = Comp::Text::Alignment::Center;
+  levelDisplayText.mWidth = 15.0f;
+
 
   nCursor.mObject = space.CreateObject();
   auto& cursorTransform = nCursor.mObject.Add<Comp::Transform>();
@@ -644,8 +680,14 @@ void AddLockingSprites(World::Object modifierObject) {
 void LevelSetup(size_t levelIdx) {
   bool resetModifiers = nCurrentLevel != levelIdx;
   nCurrentLevel = levelIdx;
-  MakeLevelEmpty(resetModifiers);
+  std::string levelText = "B <- Level ";
+  levelText += std::to_string(nCurrentLevel + 1);
+  levelText += "/";
+  levelText += std::to_string(nLevels.Size());
+  levelText += " -> N";
+  nLevelDisplay.Get<Comp::Text>().mText = levelText;
 
+  MakeLevelEmpty(resetModifiers);
   World::Space& space = World::nLayers.Back()->mSpace;
   const Level& level = nLevels[levelIdx];
   for (const Digit& digit: level.mDigits) {
