@@ -300,8 +300,8 @@ void PerformStep() {
     case Direction::Down: digit.mCell[1] -= 1; break;
     case Direction::Left: digit.mCell[0] -= 1; break;
     }
-    digit.mCell[0] = (digit.mCell[0] + 10) % 10;
-    digit.mCell[1] = (digit.mCell[1] + 10) % 10;
+    digit.mCell[0] = Math::Clamp(0, 9, digit.mCell[0]);
+    digit.mCell[1] = Math::Clamp(0, 9, digit.mCell[1]);
     nDigitLayer[digit.mCell[0]][digit.mCell[1]] = memberId;
 
     World::MemberId modifierMemberId =
