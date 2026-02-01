@@ -35,8 +35,11 @@
 
 enum class Direction { Up, Right, Down, Left };
 
+void LevelSetup(size_t levelIdx);
 bool nPaused = true;
-float nAutomataTimePassed = 0.9f;
+bool nAutomataStarted = false;
+const float nStartTime = 0.9f;
+float nAutomataTimePassed = nStartTime;
 const Vec3 nFieldOrigin = {0.0f, 0.0f, 0.0f};
 constexpr int nFieldWidth = 10;
 constexpr int nFieldHeight = 10;
@@ -67,6 +70,7 @@ struct Cursor {
 Cursor nCursor;
 
 World::Object nRunDisplay;
+const char* nRunDisplayStartText = " =";
 
 struct Digit {
   int mCell[2];
@@ -94,6 +98,7 @@ struct Level {
   Ds::Vector<Shifter> mShifters;
 };
 Ds::Vector<Level> nLevels;
+size_t nCurrentLevel = 0;
 void CreateLevels() {
   {
     Level level;
@@ -168,6 +173,15 @@ void CreateLevels() {
       },
     };
     nLevels.Emplace(std::move(level));
+  }
+}
+
+void InitializeLayers() {
+  for (int i = 0; i < 10; ++i) {
+    for (int j = 0; j < 10; ++j) {
+      nDigitLayer[j][i] = World::nInvalidMemberId;
+      nModifierLayer[j][i] = World::nInvalidMemberId;
+    }
   }
 }
 
@@ -373,21 +387,33 @@ void RunPlaceMode() {
 void CentralUpdate() {
   if (Input::KeyPressed(Input::Key::Space)) {
     nPaused = !nPaused;
-    auto& text = nRunDisplay.Get<Comp::Text>();
     if (nPaused) {
-      text.mText = "=";
+      nRunDisplay.Get<Comp::Text>().mText = "o=";
       nAutomataTimePassed = (float)(int)nAutomataTimePassed + 0.9f;
     }
     else {
-      text.mText = ">";
+      nAutomataStarted = true;
+      nRunDisplay.Get<Comp::Text>().mText = "o>";
+      nCursor.mObject.Get<Comp::Sprite>().mVisible = false;
+      nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
     }
   }
 
   if (!nPaused) {
     RunAutomata();
   }
-  else {
+  else if (!nAutomataStarted) {
     RunPlaceMode();
+  }
+
+  if (Input::KeyPressed(Input::Key::R)) {
+    nPaused = true;
+    nAutomataStarted = false;
+    nAutomataTimePassed = nStartTime;
+    nRunDisplay.Get<Comp::Text>().mText = nRunDisplayStartText;
+    nCursor.mObject.Get<Comp::Sprite>().mVisible = true;
+    nCursor.mSelectedObject.Get<Comp::Sprite>().mVisible = false;
+    LevelSetup(nCurrentLevel);
   }
 }
 
@@ -419,7 +445,7 @@ void FieldSetup() {
   auto& runDisplayText = nRunDisplay.Add<Comp::Text>();
   runDisplayText.mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   runDisplayText.mAlign = Comp::Text::Alignment::Center;
-  runDisplayText.mText = "=";
+  runDisplayText.mText = nRunDisplayStartText;
 
   nCursor.mObject = space.CreateObject();
   auto& cursorTransform = nCursor.mObject.Add<Comp::Transform>();
@@ -451,9 +477,27 @@ void FieldSetup() {
   cameraTransform.SetTranslation({9.0f, 4.5f, 3.0f});
 }
 
-void LevelSetup(size_t levelIdx) {
+void MakeLevelEmpty() {
   World::Space& space = World::nLayers.Back()->mSpace;
+  Ds::Vector<MemberId> digitMemberIds = space.Slice<Digit>();
+  for (MemberId memberId: digitMemberIds) {
+    space.DeleteMember(memberId);
+  }
+  Ds::Vector<MemberId> filterMemberIds = space.Slice<Filter>();
+  for (MemberId memberId: filterMemberIds) {
+    space.DeleteMember(memberId);
+  }
+  Ds::Vector<MemberId> shifterMemberIds = space.Slice<Shifter>();
+  for (MemberId memberId: shifterMemberIds) {
+    space.DeleteMember(memberId);
+  }
+  InitializeLayers();
+  nPlaceableIds.Clear();
+}
 
+void LevelSetup(size_t levelIdx) {
+  MakeLevelEmpty();
+  World::Space& space = World::nLayers.Back()->mSpace;
   const Level& level = nLevels[levelIdx];
   for (const Digit& digit: level.mDigits) {
     World::Object digitObject = space.CreateObject();
@@ -475,7 +519,6 @@ void LevelSetup(size_t levelIdx) {
     text.mText = std::to_string(digit.mValue);
   }
 
-  nPlaceableIds.Clear();
   for (const Filter& filter: level.mFilters) {
     World::Object filterObject = space.CreateObject();
     filterObject.Add<Filter>() = filter;
@@ -547,13 +590,6 @@ void LevelSetup(size_t levelIdx) {
 
   UpdatePlaceableGraphics();
 
-  for (int i = 0; i < 10; ++i) {
-    for (int j = 0; j < 10; ++j) {
-      nDigitLayer[j][i] = World::nInvalidMemberId;
-      nModifierLayer[j][i] = World::nInvalidMemberId;
-    }
-  }
-
   Ds::Vector<MemberId> digitIds = space.Slice<Digit>();
   for (MemberId memberId: digitIds) {
     auto& digit = space.Get<Digit>(memberId);
@@ -587,6 +623,7 @@ int main(int argc, char* argv[]) {
   LogAbortIf(!result.Success(), result.mError.c_str());
 
   CreateLevels();
+  InitializeLayers();
   FieldSetup();
   LevelSetup(0);
   World::nCentralUpdate = CentralUpdate;
