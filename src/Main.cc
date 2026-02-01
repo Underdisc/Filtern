@@ -500,7 +500,7 @@ void RunPlaceMode() {
 }
 
 void CentralUpdate() {
-  bool newLevel = nCurrentLevel;
+  int newLevel = nCurrentLevel;
   if (Input::KeyPressed(Input::Key::N)) {
     newLevel = Math::Clamp(0, (int)nLevels.Size() - 1, nCurrentLevel + 1);
   }
