@@ -10,6 +10,7 @@
 #include <comp/Sprite.h>
 #include <comp/Text.h>
 #include <comp/Transform.h>
+#include <editor/Editor.h>
 #include <gfx/Renderer.h>
 #include <imgui/imgui.h>
 #include <math/Constants.h>
@@ -875,9 +876,12 @@ int main(int argc, char* argv[]) {
   Options::Config config;
   config.mWindowName = "Filtern";
   config.mProjectDirectory = PROJECT_DIRECTORY;
-  config.mEditorLevel = Options::EditorLevel::Complete;
+  config.mEditorLevel = Options::EditorLevel::Simple;
   Result result = VarkorInit(argc, argv, std::move(config));
   LogAbortIf(!result.Success(), result.mError.c_str());
+
+  Editor::nPlayMode = true;
+  World::nPause = false;
 
   CreateLevels();
   FieldSetup();
