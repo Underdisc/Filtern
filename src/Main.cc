@@ -598,12 +598,16 @@ void LevelSetup(size_t levelIdx) {
   Ds::Vector<MemberId> filterIds = space.Slice<Filter>();
   for (MemberId memberId: filterIds) {
     auto& filter = space.Get<Filter>(memberId);
-    nModifierLayer[filter.mStartCell[0]][filter.mStartCell[1]] = memberId;
+    if (!filter.mPlaceable) {
+      nModifierLayer[filter.mStartCell[0]][filter.mStartCell[1]] = memberId;
+    }
   }
   Ds::Vector<MemberId> shifterIds = space.Slice<Shifter>();
   for (MemberId memberId: shifterIds) {
     auto& shifter = space.Get<Shifter>(memberId);
-    nModifierLayer[shifter.mStartCell[0]][shifter.mStartCell[1]] = memberId;
+    if (!shifter.mPlaceable) {
+      nModifierLayer[shifter.mStartCell[0]][shifter.mStartCell[1]] = memberId;
+    }
   }
 }
 
