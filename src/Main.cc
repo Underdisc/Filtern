@@ -182,6 +182,25 @@ void CreateLevels() {
 
   {
     Level level;
+    level.mName = "ABC...";
+    level.mDigits = {
+      {{6, 4}, 1, Direction::Up},
+    };
+    level.mRequirements = {
+      {{6, 6}, 7},
+    };
+    level.mFilters = {
+      {{-1, -1}, 1, Filter::Type::Add, true},
+    };
+    level.mShifters = {
+      {{6, 7}, Direction::Down, false},
+      {{-1, -1}, Direction::Up, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    Level level;
     level.mName = "Stay In Line";
     level.mDigits = {
       {{2, 2}, 4, Direction::Right},
@@ -196,25 +215,6 @@ void CreateLevels() {
       {{-1, -1}, 3, Filter::Type::Sub, true},
     };
     level.mShifters = {
-      {{-1, -1}, Direction::Up, true},
-    };
-    nLevels.Emplace(std::move(level));
-  }
-
-  {
-    Level level;
-    level.mName = "ABC...";
-    level.mDigits = {
-      {{6, 4}, 1, Direction::Up},
-    };
-    level.mRequirements = {
-      {{6, 6}, 7},
-    };
-    level.mFilters = {
-      {{-1, -1}, 1, Filter::Type::Add, true},
-    };
-    level.mShifters = {
-      {{6, 7}, Direction::Down, false},
       {{-1, -1}, Direction::Up, true},
     };
     nLevels.Emplace(std::move(level));
