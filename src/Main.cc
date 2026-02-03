@@ -221,6 +221,27 @@ void CreateLevels() {
 
   {
     Level level;
+    level.mName = "Together We Stand";
+    level.mDigits = {
+      {{2, 7}, 8, Direction::Down},
+      {{7, 2}, 8, Direction::Up},
+    };
+    level.mRequirements = {
+      {{9, 3}, 0},
+      {{1, 7}, 0},
+    };
+    level.mFilters = {
+      {{-1, -1}, 8, Filter::Type::Sub, true},
+    };
+    level.mShifters = {
+      {{-1, -1}, Direction::Left, true},
+      {{-1, -1}, Direction::Right, true},
+    };
+    nLevels.Emplace(std::move(level));
+  }
+
+  {
+    Level level;
     level.mName = "Stay In Line";
     level.mDigits = {
       {{2, 2}, 4, Direction::Right},
