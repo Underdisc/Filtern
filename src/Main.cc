@@ -1,3 +1,5 @@
+// Compilable with Varkor Commit: a89d178
+
 #include <Error.h>
 #include <Input.h>
 #include <Temporal.h>
