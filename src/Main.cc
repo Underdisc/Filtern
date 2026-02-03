@@ -260,6 +260,39 @@ void CreateLevels() {
     };
     nLevels.Emplace(std::move(level));
   }
+
+  {
+    Level level;
+    level.mName = "Off By One";
+    level.mDigits = {
+      {{5, 3}, 0, Direction::Up},
+      {{6, 5}, 0, Direction::Left},
+      {{4, 6}, 0, Direction::Down},
+      {{3, 4}, 0, Direction::Right},
+    };
+    level.mRequirements = {
+      {{4, 3}, 4},
+      {{6, 4}, 4},
+      {{5, 6}, 5},
+      {{3, 5}, 5},
+    };
+    level.mFilters = {
+      {{5, 4}, 1, Filter::Type::Add, false},
+      {{5, 5}, 1, Filter::Type::Add, false},
+      {{-1, -1}, 1, Filter::Type::Add, true},
+    };
+    level.mShifters = {
+      {{4, 2}, Direction::Right, false},
+      {{5, 2}, Direction::Up, false},
+      {{5, 7}, Direction::Left, false},
+      {{4, 7}, Direction::Down, false},
+      {{2, 5}, Direction::Down, false},
+      {{2, 4}, Direction::Right, false},
+      {{7, 4}, Direction::Up, false},
+      {{7, 5}, Direction::Left, false},
+    };
+    nLevels.Emplace(std::move(level));
+  }
 }
 
 void InitializeLayers(bool resetModifiers) {
